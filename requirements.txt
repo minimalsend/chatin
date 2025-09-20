@@ -2,6 +2,9 @@ git+https://github.com/minimalsend/instraapi.git#egg=instagrapi
 requests
 colorama
 pyTelegramBotAPI
+python-dotenv
+
+
 
 
 
