@@ -1,3 +1,9 @@
+# ---------------- PATCH para ignorar erros de ClipsOriginalSoundInfo ----------------
+from typing import Optional
+from instagrapi import types
+types.ClipsOriginalSoundInfo = Optional[types.ClipsOriginalSoundInfo]
+# -----------------------------------------------------------------------------------
+
 from instagrapi import Client
 import time, os, re, requests, json
 from datetime import datetime
@@ -266,3 +272,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
