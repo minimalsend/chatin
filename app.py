@@ -240,8 +240,8 @@ def setup_bot(monitor, token, allowed_user_id):
 # ---------- EXECUÇÃO ----------
 
 def main():
+    ALLOWED_USER_ID = int(os.getenv("ALLOWED_USER_ID"))  # aqui dentro
     TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-    ALLOWED_USER_ID = int(os.getenv("ALLOWED_USER_ID"))
     INSTAGRAM_USERNAME = os.getenv("INSTAGRAM_USERNAME")
     INSTAGRAM_PASSWORD = os.getenv("INSTAGRAM_PASSWORD")
 
@@ -257,5 +257,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
