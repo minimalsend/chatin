@@ -61,9 +61,10 @@ class InstagramChatMonitor:
 
     def list_chats(self):
         try:
-            return self.client.direct_threads(selected_filter="unread")
+            threads = self.client.direct_threads(selected_filter="unread")
+            return threads
         except Exception as e:
-            print(f"{Fore.RED}Erro ao listar chats: {e}{Style.RESET_ALL}")
+            print(f"{Fore.RED}⚠️ Erro ao listar chats (ignorado): {e}{Style.RESET_ALL}")
             return []
 
     def get_sender_name(self, msg):
@@ -104,7 +105,13 @@ class InstagramChatMonitor:
     def monitor_chat(self, thread_id, chat_name):
         try:
             while thread_id in self.active_chats and self.active_chats[thread_id]["monitoring"]:
-                thread = self.client.direct_thread(thread_id)
+                try:
+                    thread = self.client.direct_thread(thread_id)
+                except Exception as e:
+                    print(f"{Fore.YELLOW}⚠️ Erro ao obter thread {thread_id} (ignorado): {e}{Style.RESET_ALL}")
+                    time.sleep(2)
+                    continue
+
                 if thread.messages:
                     newest = thread.messages[0]
                     last_message_id = self.active_chats[thread_id]["last_message_id"]
@@ -124,8 +131,8 @@ class InstagramChatMonitor:
                                     result = self.redeem_code(code, chat_name)
                                     self.bot.send_message(self.allowed_user_id, f"🎯 Código detectado: <code>{code}</code>\n{result}", parse_mode="HTML")
 
-                        # Atualiza last_message_id após processar novas mensagens
                         self.active_chats[thread_id]["last_message_id"] = newest.id
+
                 time.sleep(2)
         except Exception as e:
             self.bot.send_message(self.allowed_user_id, f"❌ Erro no monitoramento: {e}")
@@ -255,3 +262,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
