@@ -59,14 +59,13 @@ class InstagramChatMonitor:
             print(f"{Fore.RED}Erro no login: {e}{Style.RESET_ALL}")
             return False
 
-   def list_chats(self):
-    try:
-        threads = self.client.direct_threads(selected_filter="unread")
-        return threads
-    except Exception:
-        # Retorna lista vazia silenciosamente
-        return []
-
+    def list_chats(self):
+        try:
+            threads = self.client.direct_threads(selected_filter="unread")
+            return threads
+        except Exception as e:
+            print(f"{Fore.RED}⚠️ Erro ao listar chats (ignorado): {e}{Style.RESET_ALL}")
+            return []
 
     def get_sender_name(self, msg):
         if getattr(msg, "is_sent_by_viewer", False):
@@ -104,49 +103,49 @@ class InstagramChatMonitor:
             return f"⚡ Erro ao resgatar código {code}: {e}"
 
     def monitor_chat(self, thread_id, chat_name):
-    try:
-        while thread_id in self.active_chats and self.active_chats[thread_id]["monitoring"]:
-            try:
-                thread = self.client.direct_thread(thread_id)
-            except Exception as e:
-                # Ignora threads problemáticas, ex: erros em clips/reels
+        try:
+            while thread_id in self.active_chats and self.active_chats[thread_id]["monitoring"]:
+                try:
+                    thread = self.client.direct_thread(thread_id)
+                except Exception as e:
+                    # Ignora threads problemáticas, ex: erros em clips/reels
+                    print(f"{Fore.YELLOW}⚠️ Erro ao obter thread {thread_id} (ignorado): {e}{Style.RESET_ALL}")
+                    time.sleep(2)
+                    continue
+
+                if thread.messages:
+                    newest = thread.messages[0]
+                    last_message_id = self.active_chats[thread_id]["last_message_id"]
+
+                    if newest.id != last_message_id:
+                        for msg in reversed(thread.messages):
+                            if last_message_id and msg.id <= last_message_id:
+                                continue
+                            try:
+                                sender = self.get_sender_name(msg)
+                                content = getattr(msg, "text", "<mídia>")
+                                text = f"[{datetime.now().strftime('%H:%M:%S')}] {sender}: {content}"
+                                self.bot.send_message(self.allowed_user_id, f"<b>{chat_name}</b>\n{text}", parse_mode="HTML")
+
+                                if getattr(msg, "text", None):
+                                    codes = re.findall(r"\b[A-Z0-9]{12}\b", msg.text)
+                                    for code in codes:
+                                        result = self.redeem_code(code, chat_name)
+                                        self.bot.send_message(self.allowed_user_id, f"🎯 Código detectado: <code>{code}</code>\n{result}", parse_mode="HTML")
+                            except Exception:
+                                # Ignora erros de mídia ou campos inesperados
+                                continue
+
+                        self.active_chats[thread_id]["last_message_id"] = newest.id
+
                 time.sleep(2)
-                continue
-
-            if thread.messages:
-                newest = thread.messages[0]
-                last_message_id = self.active_chats[thread_id]["last_message_id"]
-
-                if newest.id != last_message_id:
-                    for msg in reversed(thread.messages):
-                        if last_message_id and msg.id <= last_message_id:
-                            continue
-                        try:
-                            sender = self.get_sender_name(msg)
-                            content = getattr(msg, "text", "<mídia>")
-                            text = f"[{datetime.now().strftime('%H:%M:%S')}] {sender}: {content}"
-                            self.bot.send_message(self.allowed_user_id, f"<b>{chat_name}</b>\n{text}", parse_mode="HTML")
-
-                            if getattr(msg, "text", None):
-                                codes = re.findall(r"\b[A-Z0-9]{12}\b", msg.text)
-                                for code in codes:
-                                    result = self.redeem_code(code, chat_name)
-                                    self.bot.send_message(self.allowed_user_id, f"🎯 Código detectado: <code>{code}</code>\n{result}", parse_mode="HTML")
-                        except Exception:
-                            # Ignora erros de mídia ou campos inesperados
-                            continue
-
-                    self.active_chats[thread_id]["last_message_id"] = newest.id
-
-            time.sleep(2)
-    except Exception as e:
-        self.bot.send_message(self.allowed_user_id, f"❌ Erro no monitoramento: {e}")
+        except Exception as e:
+            self.bot.send_message(self.allowed_user_id, f"❌ Erro no monitoramento: {e}")
 
     def start_monitoring(self, thread_id, chat_name):
         if thread_id in self.active_chats:
             return False, "Já monitorando este chat"
 
-        # Ignora mensagens antigas
         last_message_id = None
         try:
             thread = self.client.direct_thread(thread_id)
@@ -267,5 +266,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
