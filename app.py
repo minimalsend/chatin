@@ -5,7 +5,9 @@ from colorama import init, Fore, Style
 import telebot
 from telebot.types import ReplyKeyboardMarkup
 import threading
+from dotenv import load_dotenv
 
+load_dotenv()
 # Inicializa colorama
 init(autoreset=True)
 
@@ -255,4 +257,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
