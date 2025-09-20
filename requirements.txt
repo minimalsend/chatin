@@ -1,0 +1,4 @@
+instagrapi
+requests
+colorama
+pyTelegramBotAPI
