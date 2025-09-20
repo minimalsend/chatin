@@ -1,19 +1,31 @@
 # ---------------- PATCH para ignorar erros de ClipsOriginalSoundInfo ----------------
+# -----------------------------------------------------------------------------------
+# Corrige erro de validação de ClipsOriginalSoundInfo do instagrapi
+# -----------------------------------------------------------------------------------
 from typing import Optional
 from instagrapi import types
-types.ClipsOriginalSoundInfo = Optional[types.ClipsOriginalSoundInfo]
-# -----------------------------------------------------------------------------------
 
-from instagrapi import Client
-import time, os, re, requests, json
+# Permite que o atributo aceite None sem quebrar o Pydantic
+types.ClipsOriginalSoundInfo = Optional[types.ClipsOriginalSoundInfo]
+
+# -----------------------------------------------------------------------------------
+# Imports principais
+# -----------------------------------------------------------------------------------
+import time
+import os
+import re
+import json
+import requests
 from datetime import datetime
 from colorama import init, Fore, Style
 import telebot
 from telebot.types import ReplyKeyboardMarkup
 import threading
+from instagrapi import Client
 
 # Inicializa colorama
 init(autoreset=True)
+
 
 class InstagramChatMonitor:
     def __init__(self, username, password, telegram_bot, allowed_user_id):
@@ -272,4 +284,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
