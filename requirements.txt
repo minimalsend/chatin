@@ -2,3 +2,5 @@ instagrapi
 requests
 colorama
 pyTelegramBotAPI
+gunicorn
+
