@@ -1,4 +1,4 @@
-instagrapi>=2.2.2
+instagrapi==2.2.1
 requests==2.32.4
 colorama==0.4.6
 pyTelegramBotAPI==4.29.1
