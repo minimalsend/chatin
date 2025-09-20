@@ -238,10 +238,10 @@ def setup_bot(monitor, token, allowed_user_id):
 # ---------- EXECUÇÃO ----------
 
 def main():
-    TELEGRAM_TOKEN = "7712229052:AAHqWgdUiNNhOWVBPesv_cOoiG3Yu9w-QWQ"
-    ALLOWED_USER_ID = 1597878100 
-    INSTAGRAM_USERNAME = "eukellyffofc"
-    INSTAGRAM_PASSWORD = "87216675BA@"
+    TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+    ALLOWED_USER_ID = int(os.getenv("ALLOWED_USER_ID"))
+    INSTAGRAM_USERNAME = os.getenv("INSTAGRAM_USERNAME")
+    INSTAGRAM_PASSWORD = os.getenv("INSTAGRAM_PASSWORD")
 
     monitor = InstagramChatMonitor(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD, None, ALLOWED_USER_ID)
     if not monitor.login():
@@ -255,3 +255,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
