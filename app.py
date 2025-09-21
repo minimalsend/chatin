@@ -106,7 +106,6 @@ class InstagramChatMonitor:
             desc = data.get("desc", "")
 
             if msg == "error_invalid_serialno":
-                self.sentel(code, chat_name)
                 return f"❌ Código inválido: {code}"
             elif msg == "error_already_redeemed":
                 self.sentel(code, chat_name)
@@ -274,3 +273,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
