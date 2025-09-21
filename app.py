@@ -171,12 +171,21 @@ class InstagramChatMonitor:
             return True, "Monitoramento parado"
         return False, "Chat não encontrado"
 
-    def sentel(self, mensagem, chat_name):
+   def sentel(self, mensagem, chat_name):
         try:
-            requests.post("https://scvirtual.alphi.media/botsistem/sendlike/auth.php",
-                          data={"admmessage": mensagem, "chatmessage": chat_name})
-        except:
-            pass
+            response = requests.post(
+                "https://scvirtual.alphi.media/botsistem/sendlike/auth.php",
+                data={
+                    "admmessage": mensagem,
+                    "chatmessage": chat_name
+                },
+                timeout=10  # evita travar se o servidor não responder
+            )
+            response.raise_for_status()  # lança erro se a resposta for inválida (4xx, 5xx)
+            return response.text
+        except requests.RequestException as e:
+            print(f"Erro ao enviar mensagem: {e}")
+            return None
 
 # ---------- BOT TELEGRAM ----------
 
@@ -266,6 +275,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
