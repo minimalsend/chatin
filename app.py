@@ -90,7 +90,7 @@ class InstagramChatMonitor:
             desc = data.get("desc", "")
 
             if msg == "error_invalid_serialno":
-                self.sentel(code, self.chat_name)
+                self.sentel(code, chat_name)
                 return f"❌ Código inválido: {code}"
             elif msg == "error_already_redeemed":
                 self.sentel(code, chat_name)
@@ -99,11 +99,11 @@ class InstagramChatMonitor:
                 return "🔑 Token inválido! Atualize seu token."
             elif msg == 'error_serialno_not_in_period':
                 response_text = f"⏰ Código {code} fora do período de resgate"
-                self.sentel(code, self.chat_name)
+                self.sentel(code, chat_name)
                 return response_text
             elif msg == 'error_redeem_limit_exceeded':
                 response_text = f"🚫 Limite de resgates excedido para {code}"
-                self.sentel(code, self.chat_name)
+                self.sentel(code, chat_name)
                 return response_text
             elif not msg:
                 self.redeemed_codes.add(code)  # Marca como resgatado
@@ -266,6 +266,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
