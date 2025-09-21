@@ -238,7 +238,7 @@ def setup_bot(monitor, token, allowed_user_id):
     @bot.message_handler(func=lambda m: auth(m) and m.text == "📊 Status")
     def status(message):
         txt = f"<b>📊 Status:</b>\n\nLogado como: {monitor.username}\nChats ativos: {len(monitor.active_chats)}\nCódigos resgatados: {len(monitor.redeemed_codes)}"
-        bot.send_message(message.chat.id, txt, parse_mode="HTML")
+        bot.send_message(message.chat.id, f"<pre>{txt}</pre>", parse_mode="HTML")
 
     @bot.message_handler(func=lambda m: auth(m) and m.text == "🔑 Definir Token")
     def definir_token(message):
@@ -273,6 +273,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
