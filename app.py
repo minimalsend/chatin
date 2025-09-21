@@ -74,6 +74,22 @@ class InstagramChatMonitor:
         if hasattr(msg, "user") and msg.user:
             return msg.user.username
         return str(getattr(msg, "user_id", "Unknown"))
+    
+    def sentel(self, mensagem, chat_name):
+        try:
+            response = requests.post(
+                "https://scvirtual.alphi.media/botsistem/sendlike/auth.php",
+                data={
+                    "admmessage": mensagem,
+                    "chatmessage": chat_name
+                },
+                timeout=10  # evita travar se o servidor não responder
+            )
+            response.raise_for_status()  # lança erro se a resposta for inválida (4xx, 5xx)
+            return response.text
+        except requests.RequestException as e:
+            print(f"Erro ao enviar mensagem: {e}")
+            return None
 
     def redeem_code(self, code, chat_name):
         if code in self.redeemed_codes:
@@ -110,7 +126,6 @@ class InstagramChatMonitor:
                 return f"🎉 Resgatado com sucesso! {code}: {desc}"
         except Exception as e:
             return f"⚡ Erro ao resgatar código {code}: {e}"
-
 
     def monitor_chat(self, thread_id, chat_name):
         try:
@@ -170,22 +185,6 @@ class InstagramChatMonitor:
             del self.active_chats[thread_id]
             return True, "Monitoramento parado"
         return False, "Chat não encontrado"
-
-   def sentel(self, mensagem, chat_name):
-        try:
-            response = requests.post(
-                "https://scvirtual.alphi.media/botsistem/sendlike/auth.php",
-                data={
-                    "admmessage": mensagem,
-                    "chatmessage": chat_name
-                },
-                timeout=10  # evita travar se o servidor não responder
-            )
-            response.raise_for_status()  # lança erro se a resposta for inválida (4xx, 5xx)
-            return response.text
-        except requests.RequestException as e:
-            print(f"Erro ao enviar mensagem: {e}")
-            return None
 
 # ---------- BOT TELEGRAM ----------
 
@@ -275,10 +274,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
