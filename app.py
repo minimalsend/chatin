@@ -209,8 +209,8 @@ def setup_bot(monitor, token, allowed_user_id):
         txt = "<b>📨 Chats disponíveis:</b>\n\n"
         for i, th in enumerate(threads, 1):
             users = ", ".join(u.username for u in th.users)
-            txt += f"<pre>{i}. {users}\nID: <code>{th.id}</code></pre>\n\n"
-        bot.send_message(message.chat.id, txt, parse_mode="HTML")
+            txt += f"{i}. {users}\nID: <code>{th.id}</code>\n\n"
+        bot.send_message(message.chat.id, f"<pre>{txt}</pre>", parse_mode="HTML")
 
     @bot.message_handler(func=lambda m: auth(m) and m.text == "🔍 Monitorar Chat")
     def monitorar(message):
@@ -273,6 +273,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
