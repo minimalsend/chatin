@@ -76,66 +76,40 @@ class InstagramChatMonitor:
         return str(getattr(msg, "user_id", "Unknown"))
 
     def redeem_code(self, code, chat_name):
-    if code in self.redeemed_codes:
-        msg = f"⚠️ Código {code} já foi resgatado anteriormente"
-        return msg
+        if code in self.redeemed_codes:
+            return f"⚠️ Código {code} já resgatado anteriormente"
 
-    url = "https://prod-api.reward.ff.garena.com/redemption/api/game/ff/redeem/"
-    headers = {
-        "authority": "prod-api.reward.ff.garena.com",
-        "accept": "application/json, text/plain, */*",
-        "access-token": self.access_token,
-        "content-type": "application/json",
-        "origin": "https://reward.ff.garena.com",
-        "referer": "https://reward.ff.garena.com/",
-        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                      "AppleWebKit/537.36 (KHTML, like Gecko) "
-                      "Chrome/138.0.0.0 Safari/537.36"
-    }
-    payload = {"serialno": code}
+        url = "https://prod-api.reward.ff.garena.com/redemption/api/game/ff/redeem/"
+        headers = {"access-token": self.access_token, "content-type": "application/json", "user-agent": "Mozilla/5.0"}
+        payload = {"serialno": code}
 
-    try:
-        r = requests.post(url, json=payload, headers=headers)
-        data = r.json()
+        try:
+            r = requests.post(url, json=payload, headers=headers)
+            data = r.json()
+            msg = data.get("msg", "")
+            desc = data.get("desc", "")
 
-        msg_code = data.get("msg", "")
-        desc = data.get("desc", "")
-
-        if msg_code == "error_invalid_serialno":
-            msg = f"❌ Código inválido: {code}"
-
-        elif msg_code == "error_too_many_requests":
-            msg = f"⏳ Muitas tentativas, token expirado"
-
-        elif msg_code == "error_different_region":
-            msg = f"🌎 Código {code} é de outra região"
-
-        elif msg_code == "error_already_redeemed":
-            msg = f"🔄 Código {code} já resgatado nesta conta"
-
-        elif msg_code == "error_serialno_not_in_period":
-            msg = f"⏰ Código {code} fora do período de resgate"
-
-        elif msg_code == "error_redeem_limit_exceeded":
-            msg = f"🚫 Limite de resgates excedido para {code}"
-
-        elif msg_code == "error_invalid_token":
-            msg = f"🔑 Token inválido ou expirado"
-
-        elif not msg_code:  # sucesso
-            self.redeemed_codes.add(code)
-            msg = f"🎉 Resgatado com sucesso! {code}: {desc}"
-
-        else:
-            msg = f"⚠️ {msg_code}: {desc}"
-
-        self.sentel(msg, chat_name)
-        return msg
-
-    except Exception as e:
-        msg = f"⚡ Erro ao resgatar {code}: {e}"
-        self.sentel(msg, chat_name)
-        return msg
+            if msg == "error_invalid_serialno":
+                self.sentel(code, self.chat_name)
+                return f"❌ Código inválido: {code}"
+            elif msg == "error_already_redeemed":
+                self.sentel(code, chat_name)
+                return f"🔄 Código já resgatado nesta conta: {code}"
+            elif msg == "error_invalid_token":
+                return "🔑 Token inválido! Atualize seu token."
+            elif msg == 'error_serialno_not_in_period':
+                response_text = f"⏰ Código {code} fora do período de resgate"
+                self.sentel(code, self.chat_name)
+                return response_text
+            elif msg == 'error_redeem_limit_exceeded':
+                response_text = f"🚫 Limite de resgates excedido para {code}"
+                self.sentel(code, self.chat_name)
+                return response_text
+            elif not msg:
+                self.redeemed_codes.add(code)  # Marca como resgatado
+                return f"🎉 Resgatado com sucesso! {code}: {desc}"
+        except Exception as e:
+            return f"⚡ Erro ao resgatar código {code}: {e}"
 
 
     def monitor_chat(self, thread_id, chat_name):
@@ -292,6 +266,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
