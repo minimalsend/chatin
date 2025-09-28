@@ -132,7 +132,7 @@ class InstagramChatMonitor:
             print(f"{Fore.CYAN}📊 Total: {len(all_chats)} chats{Style.RESET_ALL}")
             
             # DEBUG: Mostra info de cada chat
-            for i, chat in enumerate(all_chats[:10]):  # Mostra apenas os 10 primeiros
+            for i, chat in enumerate(all_chats[:25]):  # Mostra apenas os 10 primeiros
                 users = chat.users if hasattr(chat, 'users') else []
                 title = getattr(chat, 'thread_title', 'Sem título')
                 print(f"{Fore.MAGENTA}Chat {i+1}: {title} - Users: {len(users)}{Style.RESET_ALL}")
@@ -349,7 +349,7 @@ def setup_bot(token, allowed_user_id):
                 return
             
             txt = "<b>🚀 TODOS os Chats:</b>\n\n"
-            for i, th in enumerate(threads[:15], 1):  # Mostra apenas 15 para não ficar grande
+            for i, th in enumerate(threads[:25], 1):  # Mostra apenas 15 para não ficar grande
                 if hasattr(th, 'thread_title') and th.thread_title:
                     chat_name = th.thread_title
                 else:
@@ -469,4 +469,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
