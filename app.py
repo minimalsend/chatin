@@ -6,6 +6,8 @@ import telebot
 from telebot.types import ReplyKeyboardMarkup
 import threading
 from dotenv import load_dotenv
+import glob
+import shutil
 
 load_dotenv()
 # Inicializa colorama
@@ -25,6 +27,68 @@ class InstagramChatMonitor:
         self.allowed_user_id = allowed_user_id
         self.chats_list = []
         self.is_logged_in = False
+
+    def clear_all_cache(self):
+        """Limpa TODO o cache quando desloga"""
+        try:
+            print(f"{Fore.YELLOW}🧹 Limpando todo o cache...{Style.RESET_ALL}")
+            
+            # 1. Para todos os monitors ativos
+            for thread_id in list(self.active_chats.keys()):
+                self.stop_monitoring(thread_id)
+            
+            # 2. Limpa arquivos de sessão
+            if os.path.exists(self.session_file):
+                os.remove(self.session_file)
+                print(f"{Fore.GREEN}✅ Sessão removida{Style.RESET_ALL}")
+            
+            # 3. Limpa arquivos temporários do instagrapi
+            cache_files = [
+                "session.json",
+                "token.json",
+                "settings.json",
+                "cookies.json"
+            ]
+            
+            for file in cache_files:
+                if os.path.exists(file):
+                    os.remove(file)
+                    print(f"{Fore.GREEN}✅ {file} removido{Style.RESET_ALL}")
+            
+            # 4. Limpa possíveis diretórios de cache
+            cache_dirs = [
+                "__pycache__",
+                "*.pyc",
+                "*.log",
+                "temp",
+                "cache"
+            ]
+            
+            for pattern in cache_dirs:
+                if os.path.exists(pattern):
+                    if os.path.isdir(pattern):
+                        shutil.rmtree(pattern)
+                    else:
+                        for file in glob.glob(pattern):
+                            os.remove(file)
+            
+            # 5. Reseta todas as variáveis
+            self.username = None
+            self.password = None
+            self.access_token = None
+            self.redeemed_codes = set()
+            self.active_chats = {}
+            self.chats_list = []
+            self.is_logged_in = False
+            
+            # 6. Limpa token se existir
+            if os.path.exists(self.token_file):
+                os.remove(self.token_file)
+            
+            print(f"{Fore.GREEN}✅ Todo o cache foi limpo!{Style.RESET_ALL}")
+            
+        except Exception as e:
+            print(f"{Fore.RED}❌ Erro ao limpar cache: {e}{Style.RESET_ALL}")
 
     def setup_client_protection(self):
         self.client.delay_range = [0.1, 0.3]  # MUITO MAIS RÁPIDO
@@ -59,6 +123,10 @@ class InstagramChatMonitor:
 
     def login(self, username, password):
         try:
+            # Limpa cache residual antes do login
+            if os.path.exists(self.session_file):
+                os.remove(self.session_file)
+            
             self.username = username
             self.password = password
             
@@ -100,6 +168,8 @@ class InstagramChatMonitor:
                 print(f"{Fore.RED}❌ Falha rápida: {e2}{Style.RESET_ALL}")
                 self.is_logged_in = False
                 return False, f"❌ Erro: {e2}"
+
+    # ... (o resto dos métodos permanecem iguais)
 
     def list_chats(self):
         if not self.is_logged_in:
@@ -322,12 +392,9 @@ def setup_bot(token, allowed_user_id):
 
     @bot.message_handler(func=lambda m: auth(m) and m.text == "🚪 Sair")
     def logout(message):
-        monitor.is_logged_in = False
-        monitor.username = None
-        monitor.password = None
-        if os.path.exists(monitor.session_file):
-            os.remove(monitor.session_file)
-        bot.send_message(message.chat.id, "✅ Logout!", reply_markup=main_menu())
+        # CHAMA A LIMPEZA DE CACHE ANTES DE SAIR
+        monitor.clear_all_cache()
+        bot.send_message(message.chat.id, "✅ Logout e cache limpo! Nova sessão ficará limpa.", reply_markup=main_menu())
 
     @bot.message_handler(func=lambda m: auth(m) and m.text == "📋 Listar Chats")
     def listar(message):
@@ -469,6 +536,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
