@@ -23,6 +23,7 @@ class InstagramChatMonitor:
         self.active_chats = {}
         self.bot = telegram_bot
         self.allowed_user_id = allowed_user_id
+        self.chats_list = []  # Lista para armazenar chats temporariamente
 
     def setup_client_protection(self):
         self.client.delay_range = [0.1, 0.2]
@@ -63,7 +64,9 @@ class InstagramChatMonitor:
 
     def list_chats(self):
         try:
-            return self.client.direct_threads(selected_filter="unread")
+            threads = self.client.direct_threads(selected_filter="unread")
+            self.chats_list = threads  # Armazena a lista de chats
+            return threads
         except Exception as e:
             print(f"{Fore.RED}Erro ao listar chats: {e}{Style.RESET_ALL}")
             return []
@@ -206,25 +209,57 @@ def setup_bot(monitor, token, allowed_user_id):
         if not threads:
             bot.send_message(message.chat.id, "📭 Nenhum chat encontrado.")
             return
+        
         txt = "<b>📨 Chats disponíveis:</b>\n\n"
         for i, th in enumerate(threads, 1):
             users = ", ".join(u.username for u in th.users)
-            txt += f"{i}. {users}\nID: <code>{th.id}</code>\n\n"
-        bot.send_message(message.chat.id, f"<pre>{txt}</pre>", parse_mode="HTML")
+            txt += f"{i}. {users}\n\n"
+        
+        bot.send_message(message.chat.id, txt, parse_mode="HTML")
 
     @bot.message_handler(func=lambda m: auth(m) and m.text == "🔍 Monitorar Chat")
     def monitorar(message):
-        msg = bot.send_message(message.chat.id, "Digite o ID do chat:")
-        bot.register_next_step_handler(msg, lambda m: iniciar_monitor(m.text, m.chat.id))
+        threads = monitor.list_chats()
+        if not threads:
+            bot.send_message(message.chat.id, "📭 Nenhum chat encontrado.")
+            return
+        
+        # Cria teclado com números dos chats
+        markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=3)
+        numbers = [str(i) for i in range(1, len(threads) + 1)]
+        markup.add(*numbers)
+        markup.add("❌ Cancelar")
+        
+        txt = "<b>🔍 Selecione o número do chat para monitorar:</b>\n\n"
+        for i, th in enumerate(threads, 1):
+            users = ", ".join(u.username for u in th.users)
+            txt += f"{i}. {users}\n"
+        
+        msg = bot.send_message(message.chat.id, txt, parse_mode="HTML", reply_markup=markup)
+        bot.register_next_step_handler(msg, lambda m: processar_selecao_chat(m, threads))
 
-    def iniciar_monitor(thread_id, chat_id):
+    def processar_selecao_chat(message, threads):
+        if message.text == "❌ Cancelar":
+            bot.send_message(message.chat.id, "Operação cancelada.", reply_markup=main_menu())
+            return
+            
         try:
-            thread = monitor.client.direct_thread(thread_id)
-            chat_name = ", ".join(u.username for u in thread.users)
-            ok, res = monitor.start_monitoring(thread_id, chat_name)
-            bot.send_message(chat_id, res)
-        except Exception as e:
-            bot.send_message(chat_id, f"Erro: {e}")
+            selected_num = int(message.text)
+            if 1 <= selected_num <= len(threads):
+                selected_chat = threads[selected_num - 1]
+                chat_name = ", ".join(u.username for u in selected_chat.users)
+                
+                ok, res = monitor.start_monitoring(selected_chat.id, chat_name)
+                bot.send_message(message.chat.id, res, reply_markup=main_menu())
+            else:
+                bot.send_message(message.chat.id, "❌ Número inválido. Use /start para recomeçar.", reply_markup=main_menu())
+        except ValueError:
+            bot.send_message(message.chat.id, "❌ Por favor, digite um número válido. Use /start para recomeçar.", reply_markup=main_menu())
+
+    def main_menu():
+        markup = ReplyKeyboardMarkup(resize_keyboard=True)
+        markup.add("📋 Listar Chats", "🔍 Monitorar Chat", "⏹️ Parar Monitoramento", "📊 Status", "🔑 Definir Token")
+        return markup
 
     @bot.message_handler(func=lambda m: auth(m) and m.text == "⏹️ Parar Monitoramento")
     def parar(message):
@@ -238,7 +273,7 @@ def setup_bot(monitor, token, allowed_user_id):
     @bot.message_handler(func=lambda m: auth(m) and m.text == "📊 Status")
     def status(message):
         txt = f"<b>📊 Status:</b>\n\nLogado como: {monitor.username}\nChats ativos: {len(monitor.active_chats)}\nCódigos resgatados: {len(monitor.redeemed_codes)}"
-        bot.send_message(message.chat.id, f"<pre>{txt}</pre>", parse_mode="HTML")
+        bot.send_message(message.chat.id, txt, parse_mode="HTML")
 
     @bot.message_handler(func=lambda m: auth(m) and m.text == "🔑 Definir Token")
     def definir_token(message):
@@ -256,7 +291,7 @@ def setup_bot(monitor, token, allowed_user_id):
 # ---------- EXECUÇÃO ----------
 
 def main():
-    ALLOWED_USER_ID = int(os.getenv("ALLOWED_USER_ID"))  # aqui dentro
+    ALLOWED_USER_ID = int(os.getenv("ALLOWED_USER_ID"))
     TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
     INSTAGRAM_USERNAME = os.getenv("INSTAGRAM_USERNAME")
     INSTAGRAM_PASSWORD = os.getenv("INSTAGRAM_PASSWORD")
@@ -273,10 +308,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
