@@ -34,6 +34,7 @@ class InstagramChatMonitor:
     def setup_client_protection(self):
         self.client.delay_range = [0.1, 0.3]
         self.client.request_timeout = 10
+        # Configurações para evitar verificação
         self.client.set_user_agent("Instagram 269.0.0.18.75 Android (26/8.0.0; 480dpi; 1080x1920; OnePlus; ONEPLUS A6013; OnePlus; qcom; en_US; 314665256)")
         self.client.set_device({
             "app_version": "269.0.0.18.75",
@@ -105,22 +106,11 @@ class InstagramChatMonitor:
     def handle_challenge(self, challenge):
         """Lida com o desafio de verificação"""
         try:
-            print(f"{Fore.YELLOW}📱 Método de verificação: {challenge}{Style.RESET_ALL}")
+            print(f"{Fore.YELLOW}📱 Iniciando processo de verificação...{Style.RESET_ALL}")
             
-            # Pega as opções disponíveis
-            if hasattr(challenge, 'challenge_type'):
-                challenge_type = challenge.challenge_type
-            else:
-                challenge_type = str(challenge)
-            
-            # Tenta usar email primeiro
-            if 'email' in challenge_type.lower():
-                print(f"{Fore.YELLOW}📧 Enviando código para email...{Style.RESET_ALL}")
-                return self.client.challenge_resolve(self.challenge_context, '1')  # Email
-            else:
-                # Tenta qualquer método disponível
-                print(f"{Fore.YELLOW}🔄 Tentando resolver desafio...{Style.RESET_ALL}")
-                return self.client.challenge_resolve(self.challenge_context)
+            # Tenta usar email como método padrão
+            print(f"{Fore.YELLOW}📧 Selecionando email como método de verificação...{Style.RESET_ALL}")
+            return self.client.challenge_resolve(self.challenge_context, '1')  # 1 = Email
                 
         except Exception as e:
             print(f"{Fore.RED}❌ Erro ao lidar com desafio: {e}{Style.RESET_ALL}")
@@ -131,16 +121,12 @@ class InstagramChatMonitor:
         try:
             print(f"{Fore.YELLOW}🔑 Tentando login com código: {code}{Style.RESET_ALL}")
             
-            if self.challenge_context:
-                # Resolve o desafio com o código
-                result = self.client.challenge_resolve(self.challenge_context, code)
-                print(f"{Fore.GREEN}✅ Desafio resolvido!{Style.RESET_ALL}")
-                
-                # Agora tenta login novamente
-                self.client.login(self.login_username, self.login_password)
-            else:
-                # Login normal com código de verificação
-                self.client.login(self.login_username, self.login_password, verification_code=code)
+            # Resolve o desafio com o código
+            result = self.client.challenge_resolve(self.challenge_context, code)
+            print(f"{Fore.GREEN}✅ Desafio resolvido!{Style.RESET_ALL}")
+            
+            # Agora tenta login novamente com as credenciais salvas
+            self.client.login(self.login_username, self.login_password)
             
             self.client.dump_settings(self.session_file)
             user_id = self.client.user_id
@@ -161,11 +147,33 @@ class InstagramChatMonitor:
             print(f"{Fore.RED}❌ Erro login com código: {e}{Style.RESET_ALL}")
             return False, f"❌ Código inválido ou erro: {e}"
 
+    def login_with_2fa(self, code):
+        """Login com autenticação de dois fatores"""
+        try:
+            print(f"{Fore.YELLOW}🔑 Tentando login com 2FA: {code}{Style.RESET_ALL}")
+            
+            self.client.login(self.login_username, self.login_password, verification_code=code)
+            
+            self.client.dump_settings(self.session_file)
+            user_id = self.client.user_id
+            
+            print(f"{Fore.GREEN}✅ Login com 2FA concluído!{Style.RESET_ALL}")
+            
+            self.username = self.login_username
+            self.password = self.login_password
+            self.is_logged_in = True
+            self.waiting_for_code = False
+            self.login_username = None
+            self.login_password = None
+            
+            return True, f"✅ Login com 2FA!\n👤 User ID: {user_id}"
+            
+        except Exception as e:
+            print(f"{Fore.RED}❌ Erro login com 2FA: {e}{Style.RESET_ALL}")
+            return False, f"❌ Código 2FA inválido: {e}"
+
     def login(self, username, password):
         try:
-            self.username = username
-            self.password = password
-            
             self.setup_client_protection()
             
             # Tenta carregar sessão existente primeiro
@@ -176,6 +184,8 @@ class InstagramChatMonitor:
                     # Testa se a sessão é válida
                     user_id = self.client.user_id
                     print(f"{Fore.GREEN}✅ Sessão carregada! User ID: {user_id}{Style.RESET_ALL}")
+                    self.username = username
+                    self.password = password
                     self.is_logged_in = True
                     return True, f"✅ Login com sessão!\n👤 User ID: {user_id}"
                 except Exception as e:
@@ -188,46 +198,59 @@ class InstagramChatMonitor:
             
             print(f"{Fore.YELLOW}🔑 Tentando login...{Style.RESET_ALL}")
             
+            # Configura um handler personalizado para desafios
+            def challenge_handler(client, choice):
+                print(f"{Fore.YELLOW}📱 Desafio detectado, escolha: {choice}{Style.RESET_ALL}")
+                if choice == ChallengeChoice.EMAIL:
+                    return 1  # Sempre escolhe email
+                return 1  # Fallback para email
+            
+            # Tenta login com handler personalizado
             try:
-                # Tenta login direto
                 self.client.login(username, password)
                 self.client.dump_settings(self.session_file)
                 user_id = self.client.user_id
                 print(f"{Fore.GREEN}✅ Login direto concluído!{Style.RESET_ALL}")
+                self.username = username
+                self.password = password
                 self.is_logged_in = True
                 return True, f"✅ Login rápido!\n👤 User ID: {user_id}"
                 
-            except (ChallengeRequired, TwoFactorRequired) as e:
-                print(f"{Fore.YELLOW}📱 Verificação em duas etapas necessária{Style.RESET_ALL}")
+            except ChallengeRequired as e:
+                print(f"{Fore.YELLOW}🛡️ Desafio de segurança detectado{Style.RESET_ALL}")
                 
-                # Prepara para receber código
+                try:
+                    # Obtém o contexto do desafio
+                    self.challenge_context = self.client.last_json
+                    print(f"{Fore.YELLOW}📱 Contexto do desafio obtido{Style.RESET_ALL}")
+                    
+                    # Tenta resolver via email
+                    challenge_info = self.handle_challenge(e)
+                    if challenge_info:
+                        print(f"{Fore.GREEN}✅ Desafio iniciado, aguardando código...{Style.RESET_ALL}")
+                        self.waiting_for_code = True
+                        self.login_username = username
+                        self.login_password = password
+                        return False, "📱 Código de verificação necessário!\n\nFoi enviado um código para seu email. Digite o código de 6 dígitos:"
+                    else:
+                        self.waiting_for_code = True
+                        self.login_username = username
+                        self.login_password = password
+                        return False, "📱 Verificação necessária!\n\nDigite o código de 6 dígitos enviado para seu email:"
+                        
+                except Exception as challenge_error:
+                    print(f"{Fore.RED}❌ Erro no desafio: {challenge_error}{Style.RESET_ALL}")
+                    self.waiting_for_code = True
+                    self.login_username = username
+                    self.login_password = password
+                    return False, "📱 Verificação necessária!\n\nDigite o código de 6 dígitos enviado para seu email:"
+                
+            except TwoFactorRequired as e:
+                print(f"{Fore.YELLOW}📱 Autenticação em duas etapas necessária{Style.RESET_ALL}")
                 self.waiting_for_code = True
                 self.login_username = username
                 self.login_password = password
-                
-                if isinstance(e, ChallengeRequired):
-                    print(f"{Fore.YELLOW}🛡️ Desafio de segurança detectado{Style.RESET_ALL}")
-                    try:
-                        # Tenta obter o contexto do desafio
-                        self.challenge_context = self.client.last_json.get('challenge', {}).get('context')
-                        if not self.challenge_context:
-                            self.challenge_context = self.client.last_json
-                        
-                        # Tenta resolver automaticamente
-                        challenge_info = self.handle_challenge(e)
-                        if challenge_info:
-                            print(f"{Fore.GREEN}✅ Desafio iniciado, aguardando código...{Style.RESET_ALL}")
-                            return False, "📱 Código de verificação necessário!\n\nFoi enviado um código para seu email. Digite o código de 6 dígitos:"
-                        else:
-                            return False, "📱 Verificação necessária!\n\nDigite o código de 6 dígitos enviado para seu email:"
-                            
-                    except Exception as challenge_error:
-                        print(f"{Fore.RED}❌ Erro no desafio: {challenge_error}{Style.RESET_ALL}")
-                        return False, "📱 Verificação necessária!\n\nDigite o código de 6 dígitos enviado para seu email:"
-                
-                else:
-                    # TwoFactorRequired
-                    return False, "📱 Verificação em duas etapas!\n\nDigite o código de 6 dígitos do autenticador:"
+                return False, "📱 Autenticação em duas etapas!\n\nDigite o código de 6 dígitos do autenticador:"
                     
             except Exception as e:
                 print(f"{Fore.RED}❌ Erro no login: {e}{Style.RESET_ALL}")
@@ -451,7 +474,7 @@ def setup_bot(token, allowed_user_id):
         
         def fazer_login():
             success, result = monitor.login(username, password)
-            if not success and ("código" in result.lower() or "verificação" in result.lower()):
+            if not success and ("código" in result.lower() or "verificação" in result.lower() or "autenticação" in result.lower()):
                 # Precisa de código de verificação
                 bot.send_message(message.chat.id, result, parse_mode="HTML")
             else:
@@ -475,7 +498,10 @@ def setup_bot(token, allowed_user_id):
             bot.send_message(message.chat.id, f"🔑 Verificando código: {code}...")
             
             def verificar_codigo():
-                success, result = monitor.login_with_code(code)
+                if monitor.challenge_context:
+                    success, result = monitor.login_with_code(code)
+                else:
+                    success, result = monitor.login_with_2fa(code)
                 bot.send_message(message.chat.id, result, parse_mode="HTML", reply_markup=main_menu())
             
             threading.Thread(target=verificar_codigo).start()
