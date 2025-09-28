@@ -119,7 +119,7 @@ class InstagramChatMonitor:
     def login_with_code(self, code):
         """Finaliza o login com o código de verificação"""
         try:
-            print(f"{Fore.YELLOW}🔑 Tentando login com código: {code}{Style.RESET_ALL}")
+            print(f"{Fore.YELLOW} Tentando login com código: {code}{Style.RESET_ALL}")
             
             # Resolve o desafio com o código
             result = self.client.challenge_resolve(self.challenge_context, code)
@@ -650,4 +650,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
