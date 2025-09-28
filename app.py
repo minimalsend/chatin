@@ -215,7 +215,7 @@ def setup_bot(monitor, token, allowed_user_id):
             users = ", ".join(u.username for u in th.users)
             txt += f"{i}. {users}\n\n"
         
-        bot.send_message(message.chat.id, txt, parse_mode="HTML")
+        bot.send_message(message.chat.id, f"<pre>{txt}</pre>", parse_mode="HTML")
 
     @bot.message_handler(func=lambda m: auth(m) and m.text == "🔍 Monitorar Chat")
     def monitorar(message):
@@ -235,7 +235,7 @@ def setup_bot(monitor, token, allowed_user_id):
             users = ", ".join(u.username for u in th.users)
             txt += f"{i}. {users}\n"
         
-        msg = bot.send_message(message.chat.id, txt, parse_mode="HTML", reply_markup=markup)
+        msg = bot.send_message(message.chat.id, f"<pre>{txt}</pre>", parse_mode="HTML", reply_markup=markup)
         bot.register_next_step_handler(msg, lambda m: processar_selecao_chat(m, threads))
 
     def processar_selecao_chat(message, threads):
@@ -308,3 +308,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
