@@ -359,8 +359,8 @@ def setup_bot(token, allowed_user_id):
                 user_count = len(th.users) if th.users else 0
                 txt += f"{i}. {chat_name} 👥{user_count}\n"
             
-            if len(threads) > 15:
-                txt += f"\n... e mais {len(threads) - 15} chats"
+            if len(threads) > 25:
+                txt += f"\n... e mais {len(threads) - 25} chats"
             
             bot.send_message(message.chat.id, f"<pre>{txt}</pre>", parse_mode="HTML")
         
@@ -469,3 +469,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
