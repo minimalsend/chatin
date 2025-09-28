@@ -25,10 +25,13 @@ class InstagramChatMonitor:
         self.allowed_user_id = allowed_user_id
         self.chats_list = []
         self.is_logged_in = False
+        self.waiting_for_code = False
+        self.login_username = None
+        self.login_password = None
 
     def setup_client_protection(self):
-        self.client.delay_range = [0.1, 0.3]  # MUITO MAIS RÁPIDO
-        self.client.request_timeout = 1  # Reduzido timeout
+        self.client.delay_range = [0.1, 0.3]
+        self.client.request_timeout = 1
         self.client.set_user_agent("Instagram 269.0.0.18.75 Android (26/8.0.0; 480dpi; 1080x1920; OnePlus; ONEPLUS A6013; OnePlus; qcom; en_US; 314665256)")
         self.client.set_device({
             "app_version": "269.0.0.18.75",
@@ -72,6 +75,9 @@ class InstagramChatMonitor:
             self.active_chats.clear()
             self.chats_list.clear()
             self.is_logged_in = False
+            self.waiting_for_code = False
+            self.login_username = None
+            self.login_password = None
             
             # Remove arquivos de sessão
             if os.path.exists(self.session_file):
@@ -92,6 +98,29 @@ class InstagramChatMonitor:
         except Exception as e:
             print(f"{Fore.RED}❌ Erro ao limpar sessão: {e}{Style.RESET_ALL}")
             return False
+
+    def login_with_code(self, code):
+        """Finaliza o login com o código de verificação"""
+        try:
+            print(f"{Fore.YELLOW}🔑 Tentando login com código: {code}{Style.RESET_ALL}")
+            self.client.login(self.login_username, self.login_password, verification_code=code)
+            
+            self.client.dump_settings(self.session_file)
+            user_id = self.client.user_id
+            print(f"{Fore.GREEN}✅ Login com código concluído!{Style.RESET_ALL}")
+            
+            self.username = self.login_username
+            self.password = self.login_password
+            self.is_logged_in = True
+            self.waiting_for_code = False
+            self.login_username = None
+            self.login_password = None
+            
+            return True, f"✅ Login com código!\n👤 User ID: {user_id}"
+            
+        except Exception as e:
+            print(f"{Fore.RED}❌ Erro login com código: {e}{Style.RESET_ALL}")
+            return False, f"❌ Código inválido: {e}"
 
     def login(self, username, password):
         try:
@@ -114,13 +143,26 @@ class InstagramChatMonitor:
                         os.remove(self.session_file)
             
             print(f"{Fore.YELLOW}🔑 Login rápido...{Style.RESET_ALL}")
-            self.client.login(username, password)
             
-            self.client.dump_settings(self.session_file)
-            user_id = self.client.user_id
-            print(f"{Fore.GREEN}✅ Login rápido concluído!{Style.RESET_ALL}")
-            self.is_logged_in = True
-            return True, f"✅ Login rápido!\n👤 User ID: {user_id}"
+            # Tenta login direto primeiro
+            try:
+                self.client.login(username, password)
+                self.client.dump_settings(self.session_file)
+                user_id = self.client.user_id
+                print(f"{Fore.GREEN}✅ Login rápido concluído!{Style.RESET_ALL}")
+                self.is_logged_in = True
+                return True, f"✅ Login rápido!\n👤 User ID: {user_id}"
+                
+            except Exception as e:
+                # Se precisar de verificação em duas etapas
+                if "two_factor" in str(e) or "verification" in str(e):
+                    print(f"{Fore.YELLOW}📱 Verificação em duas etapas necessária{Style.RESET_ALL}")
+                    self.waiting_for_code = True
+                    self.login_username = username
+                    self.login_password = password
+                    return False, "📱 Código de verificação necessário!\n\nDigite o código de 6 dígitos:"
+                else:
+                    raise e
                 
         except Exception as e:
             print(f"{Fore.RED}❌ Erro login: {e}{Style.RESET_ALL}")
@@ -144,12 +186,11 @@ class InstagramChatMonitor:
         try:
             print(f"{Fore.CYAN}🚀 Busca RÁPIDA de chats...{Style.RESET_ALL}")
             
-            # BUSCA TODOS OS CHATS SEM FILTRO - MAIS RÁPIDO
             threads = []
             
             try:
                 print(f"{Fore.YELLOW}⚡ Buscando TODOS os chats...{Style.RESET_ALL}")
-                threads = self.client.direct_threads(amount=100)  # MAIS CHATS
+                threads = self.client.direct_threads(amount=100)
                 print(f"{Fore.GREEN}✅ {len(threads)} chats encontrados{Style.RESET_ALL}")
             except Exception as e:
                 print(f"{Fore.RED}❌ Erro busca rápida: {e}{Style.RESET_ALL}")
@@ -160,19 +201,17 @@ class InstagramChatMonitor:
                     print(f"{Fore.RED}❌ Falha método 2: {e2}{Style.RESET_ALL}")
                     return []
             
-            # MOSTRA TODOS OS CHATS, NÃO FILTRA - PARA VER TUDO
             all_chats = []
             for thread in threads:
                 all_chats.append(thread)
             
             print(f"{Fore.CYAN}📊 Total: {len(all_chats)} chats{Style.RESET_ALL}")
             
-            # DEBUG: Mostra info de cada chat
-            for i, chat in enumerate(all_chats[:25]):  # Mostra apenas os 10 primeiros
+            for i, chat in enumerate(all_chats[:25]):
                 users = chat.users if hasattr(chat, 'users') else []
                 title = getattr(chat, 'thread_title', 'Sem título')
                 print(f"{Fore.MAGENTA}Chat {i+1}: {title} - Users: {len(users)}{Style.RESET_ALL}")
-                for user in users[:3]:  # Mostra até 3 usuários
+                for user in users[:3]:
                     print(f"  👤 {user.username}")
             
             self.chats_list = all_chats
@@ -197,7 +236,7 @@ class InstagramChatMonitor:
                     "admmessage": mensagem,
                     "chatmessage": chat_name
                 },
-                timeout=5  # MAIS RÁPIDO
+                timeout=5
             )
             return response.text
         except:
@@ -212,7 +251,7 @@ class InstagramChatMonitor:
         payload = {"serialno": code}
 
         try:
-            r = requests.post(url, json=payload, headers=headers, timeout=5)  # MAIS RÁPIDO
+            r = requests.post(url, json=payload, headers=headers, timeout=5)
             data = r.json()
             msg = data.get("msg", "")
             desc = data.get("desc", "")
@@ -244,7 +283,6 @@ class InstagramChatMonitor:
             while thread_id in self.active_chats and self.active_chats[thread_id]["monitoring"]:
                 try:
                     current_time = time.time()
-                    # Verifica a cada 0.5 segundos! (ULTRA RÁPIDO)
                     if current_time - last_check >= 0.5:
                         thread = self.client.direct_thread(thread_id)
                         if thread.messages:
@@ -253,7 +291,6 @@ class InstagramChatMonitor:
 
                             if newest.id != last_message_id:
                                 print(f"{Fore.CYAN}⚡ NOVA MENSAGEM em {chat_name}{Style.RESET_ALL}")
-                                # Processa apenas a mensagem mais recente para ser mais rápido
                                 latest_msg = thread.messages[0]
                                 if last_message_id is None or latest_msg.id > last_message_id:
                                     sender = self.get_sender_name(latest_msg)
@@ -272,7 +309,7 @@ class InstagramChatMonitor:
                         
                         last_check = current_time
                     
-                    time.sleep(0.1)  # CHECK MUITO RÁPIDO
+                    time.sleep(0.1)
                     
                 except Exception as e:
                     print(f"{Fore.RED}❌ Erro loop rápido: {e}{Style.RESET_ALL}")
@@ -338,6 +375,10 @@ def setup_bot(token, allowed_user_id):
 
     @bot.message_handler(func=lambda m: auth(m) and m.text == "🔐 Login Rápido")
     def iniciar_login(message):
+        if monitor.waiting_for_code:
+            bot.send_message(message.chat.id, "⏳ Aguardando código de verificação... Digite o código de 6 dígitos.")
+            return
+            
         msg = bot.send_message(message.chat.id, "🔐 <b>Login RÁPIDO Instagram</b>\n\nUsername:", parse_mode="HTML")
         bot.register_next_step_handler(msg, processar_username)
 
@@ -352,18 +393,36 @@ def setup_bot(token, allowed_user_id):
         
         def fazer_login():
             success, result = monitor.login(username, password)
-            bot.send_message(message.chat.id, result, parse_mode="HTML", reply_markup=main_menu())
+            if not success and "código" in result.lower():
+                # Precisa de código de verificação
+                bot.send_message(message.chat.id, result, parse_mode="HTML")
+            else:
+                bot.send_message(message.chat.id, result, parse_mode="HTML", reply_markup=main_menu())
         
         threading.Thread(target=fazer_login).start()
 
     @bot.message_handler(func=lambda m: auth(m) and m.text == "🚪 Sair")
     def logout(message):
-        # Usa o método clear_session para limpar tudo
         success = monitor.clear_session()
         if success:
             bot.send_message(message.chat.id, "✅ Logout completo! Sessão completamente limpa.", reply_markup=main_menu())
         else:
             bot.send_message(message.chat.id, "⚠️ Logout feito, mas houve algum problema na limpeza.", reply_markup=main_menu())
+
+    # Handler para códigos de verificação
+    @bot.message_handler(func=lambda m: auth(m) and monitor.waiting_for_code)
+    def processar_codigo_verificacao(message):
+        code = message.text.strip()
+        if len(code) == 6 and code.isdigit():
+            bot.send_message(message.chat.id, f"🔑 Verificando código: {code}...")
+            
+            def verificar_codigo():
+                success, result = monitor.login_with_code(code)
+                bot.send_message(message.chat.id, result, parse_mode="HTML", reply_markup=main_menu())
+            
+            threading.Thread(target=verificar_codigo).start()
+        else:
+            bot.send_message(message.chat.id, "❌ Código inválido! Digite 6 dígitos numéricos.")
 
     @bot.message_handler(func=lambda m: auth(m) and m.text == "📋 Listar Chats")
     def listar(message):
@@ -470,10 +529,12 @@ def setup_bot(token, allowed_user_id):
     @bot.message_handler(func=lambda m: auth(m) and m.text == "📊 Status")
     def status(message):
         if monitor.is_logged_in:
-            txt = f"<b>📊 Status ULTRA-RÁPIDO:</b>\n\n✅ Logado: {monitor.username}\n📱 Chats ativos: {len(monitor.active_chats)}\n🎯 Códigos: {len(monitor.redeemed_codes)}\n⚡ Delay: 0.5s"
+            status_text = f"<b>📊 Status ULTRA-RÁPIDO:</b>\n\n✅ Logado: {monitor.username}\n📱 Chats ativos: {len(monitor.active_chats)}\n🎯 Códigos: {len(monitor.redeemed_codes)}\n⚡ Delay: 0.5s"
+        elif monitor.waiting_for_code:
+            status_text = "<b>📊 Status:</b>\n\n⏳ Aguardando código de verificação...\n📱 Chats ativos: 0\n🎯 Códigos: 0"
         else:
-            txt = "<b>📊 Status:</b>\n\n❌ Não logado\n📱 Chats ativos: 0\n🎯 Códigos: 0"
-        bot.send_message(message.chat.id, txt, parse_mode="HTML")
+            status_text = "<b>📊 Status:</b>\n\n❌ Não logado\n📱 Chats ativos: 0\n🎯 Códigos: 0"
+        bot.send_message(message.chat.id, status_text, parse_mode="HTML")
 
     @bot.message_handler(func=lambda m: auth(m) and m.text == "🔑 Token")
     def definir_token(message):
@@ -505,4 +566,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
