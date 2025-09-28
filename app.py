@@ -381,12 +381,12 @@ def setup_bot(token, allowed_user_id):
                 return
             
             markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=3)
-            numbers = [str(i) for i in range(1, min(len(threads), 10) + 1)]  # Máximo 10
+            numbers = [str(i) for i in range(1, min(len(threads), 25) + 1)]  # Máximo 10
             markup.add(*numbers)
             markup.add("❌ Cancelar")
             
             txt = "<b>🔍 Chat para monitorar (ULTRA-RÁPIDO):</b>\n\n"
-            for i, th in enumerate(threads[:10], 1):
+            for i, th in enumerate(threads[:25], 1):
                 if hasattr(th, 'thread_title') and th.thread_title:
                     chat_name = th.thread_title
                 else:
@@ -469,5 +469,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
