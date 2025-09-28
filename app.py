@@ -213,7 +213,7 @@ def setup_bot(monitor, token, allowed_user_id):
         txt = "<b>📨 Chats disponíveis:</b>\n\n"
         for i, th in enumerate(threads, 1):
             users = ", ".join(u.username for u in th.users)
-            txt += f"{i}. {users}\n\n"
+            txt += f"{i}. {users}\n"
         
         bot.send_message(message.chat.id, f"<pre>{txt}</pre>", parse_mode="HTML")
 
@@ -308,4 +308,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
