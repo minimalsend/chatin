@@ -1,4 +1,4 @@
-eu quero que quando eu deslogar da conta, ele limpa a sessão inteira ate o arquivo from instagrapi import Client
+from instagrapi import Client
 import time, os, re, requests, json
 from datetime import datetime
 from colorama import init, Fore, Style
@@ -505,3 +505,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
