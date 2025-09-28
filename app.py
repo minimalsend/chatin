@@ -1,5 +1,4 @@
 from instagrapi import Client
-from instagrapi.exceptions import ChallengeRequired, TwoFactorRequired
 import time, os, re, requests, json
 from datetime import datetime
 from colorama import init, Fore, Style
@@ -26,15 +25,10 @@ class InstagramChatMonitor:
         self.allowed_user_id = allowed_user_id
         self.chats_list = []
         self.is_logged_in = False
-        self.waiting_for_code = False
-        self.login_username = None
-        self.login_password = None
-        self.challenge_context = None
 
     def setup_client_protection(self):
-        self.client.delay_range = [0.1, 0.3]
-        self.client.request_timeout = 1
-        # Configurações para evitar verificação
+        self.client.delay_range = [0.1, 0.3]  # MUITO MAIS RÁPIDO
+        self.client.request_timeout = 1  # Reduzido timeout
         self.client.set_user_agent("Instagram 269.0.0.18.75 Android (26/8.0.0; 480dpi; 1080x1920; OnePlus; ONEPLUS A6013; OnePlus; qcom; en_US; 314665256)")
         self.client.set_device({
             "app_version": "269.0.0.18.75",
@@ -63,202 +57,49 @@ class InstagramChatMonitor:
         except Exception as e:
             print(f"{Fore.RED}Erro ao salvar token: {e}{Style.RESET_ALL}")
 
-    def clear_session(self):
-        """Limpa completamente a sessão e todos os dados"""
-        try:
-            # Para todos os monitors ativos
-            for thread_id in list(self.active_chats.keys()):
-                self.stop_monitoring(thread_id)
-            
-            # Limpa dados da memória
-            self.username = None
-            self.password = None
-            self.access_token = None
-            self.redeemed_codes.clear()
-            self.active_chats.clear()
-            self.chats_list.clear()
-            self.is_logged_in = False
-            self.waiting_for_code = False
-            self.login_username = None
-            self.login_password = None
-            self.challenge_context = None
-            
-            # Remove arquivos de sessão
-            if os.path.exists(self.session_file):
-                os.remove(self.session_file)
-                print(f"{Fore.GREEN}✅ Arquivo de sessão removido: {self.session_file}{Style.RESET_ALL}")
-            
-            # Remove arquivo de token (opcional)
-            if os.path.exists(self.token_file):
-                os.remove(self.token_file)
-                print(f"{Fore.GREEN}✅ Arquivo de token removido: {self.token_file}{Style.RESET_ALL}")
-            
-            # Cria novo cliente para limpar completamente
-            self.client = Client()
-            self.setup_client_protection()
-            
-            print(f"{Fore.GREEN}✅ Sessão completamente limpa!{Style.RESET_ALL}")
-            return True
-        except Exception as e:
-            print(f"{Fore.RED}❌ Erro ao limpar sessão: {e}{Style.RESET_ALL}")
-            return False
-
-    def handle_challenge(self, challenge):
-        """Lida com o desafio de verificação"""
-        try:
-            print(f"{Fore.YELLOW}📱 Iniciando processo de verificação...{Style.RESET_ALL}")
-            
-            # Tenta usar email como método padrão
-            print(f"{Fore.YELLOW}📧 Selecionando email como método de verificação...{Style.RESET_ALL}")
-            return self.client.challenge_resolve(self.challenge_context, '1')  # 1 = Email
-                
-        except Exception as e:
-            print(f"{Fore.RED}❌ Erro ao lidar com desafio: {e}{Style.RESET_ALL}")
-            return None
-
-    def login_with_code(self, code):
-        """Finaliza o login com o código de verificação"""
-        try:
-            print(f"{Fore.YELLOW} Tentando login com código: {code}{Style.RESET_ALL}")
-            
-            # Resolve o desafio com o código
-            result = self.client.challenge_resolve(self.challenge_context, code)
-            print(f"{Fore.GREEN}✅ Desafio resolvido!{Style.RESET_ALL}")
-            
-            # Agora tenta login novamente com as credenciais salvas
-            self.client.login(self.login_username, self.login_password)
-            
-            self.client.dump_settings(self.session_file)
-            user_id = self.client.user_id
-            
-            print(f"{Fore.GREEN}✅ Login com código concluído!{Style.RESET_ALL}")
-            
-            self.username = self.login_username
-            self.password = self.login_password
-            self.is_logged_in = True
-            self.waiting_for_code = False
-            self.login_username = None
-            self.login_password = None
-            self.challenge_context = None
-            
-            return True, f"✅ Login com código!\n👤 User ID: {user_id}"
-            
-        except Exception as e:
-            print(f"{Fore.RED}❌ Erro login com código: {e}{Style.RESET_ALL}")
-            return False, f"❌ Código inválido ou erro: {e}"
-
-    def login_with_2fa(self, code):
-        """Login com autenticação de dois fatores"""
-        try:
-            print(f"{Fore.YELLOW}🔑 Tentando login com 2FA: {code}{Style.RESET_ALL}")
-            
-            self.client.login(self.login_username, self.login_password, verification_code=code)
-            
-            self.client.dump_settings(self.session_file)
-            user_id = self.client.user_id
-            
-            print(f"{Fore.GREEN}✅ Login com 2FA concluído!{Style.RESET_ALL}")
-            
-            self.username = self.login_username
-            self.password = self.login_password
-            self.is_logged_in = True
-            self.waiting_for_code = False
-            self.login_username = None
-            self.login_password = None
-            
-            return True, f"✅ Login com 2FA!\n👤 User ID: {user_id}"
-            
-        except Exception as e:
-            print(f"{Fore.RED}❌ Erro login com 2FA: {e}{Style.RESET_ALL}")
-            return False, f"❌ Código 2FA inválido: {e}"
-
     def login(self, username, password):
         try:
+            self.username = username
+            self.password = password
+            
             self.setup_client_protection()
             
-            # Tenta carregar sessão existente primeiro
             if os.path.exists(self.session_file):
                 print(f"{Fore.YELLOW}📁 Carregando sessão...{Style.RESET_ALL}")
                 try:
                     self.client.load_settings(self.session_file)
-                    # Testa se a sessão é válida
                     user_id = self.client.user_id
                     print(f"{Fore.GREEN}✅ Sessão carregada! User ID: {user_id}{Style.RESET_ALL}")
-                    self.username = username
-                    self.password = password
                     self.is_logged_in = True
                     return True, f"✅ Login com sessão!\n👤 User ID: {user_id}"
                 except Exception as e:
                     print(f"{Fore.YELLOW}⚠️ Sessão inválida...{Style.RESET_ALL}")
                     if os.path.exists(self.session_file):
                         os.remove(self.session_file)
-                    # Cria novo cliente
-                    self.client = Client()
-                    self.setup_client_protection()
             
-            print(f"{Fore.YELLOW}🔑 Tentando login...{Style.RESET_ALL}")
+            print(f"{Fore.YELLOW}🔑 Login rápido...{Style.RESET_ALL}")
+            self.client.login(username, password)
             
-            # Configura um handler personalizado para desafios
-            def challenge_handler(client, choice):
-                print(f"{Fore.YELLOW}📱 Desafio detectado, escolha: {choice}{Style.RESET_ALL}")
-                if choice == ChallengeChoice.EMAIL:
-                    return 1  # Sempre escolhe email
-                return 1  # Fallback para email
-            
-            # Tenta login com handler personalizado
-            try:
-                self.client.login(username, password)
-                self.client.dump_settings(self.session_file)
-                user_id = self.client.user_id
-                print(f"{Fore.GREEN}✅ Login direto concluído!{Style.RESET_ALL}")
-                self.username = username
-                self.password = password
-                self.is_logged_in = True
-                return True, f"✅ Login rápido!\n👤 User ID: {user_id}"
-                
-            except ChallengeRequired as e:
-                print(f"{Fore.YELLOW}🛡️ Desafio de segurança detectado{Style.RESET_ALL}")
-                
-                try:
-                    # Obtém o contexto do desafio
-                    self.challenge_context = self.client.last_json
-                    print(f"{Fore.YELLOW}📱 Contexto do desafio obtido{Style.RESET_ALL}")
-                    
-                    # Tenta resolver via email
-                    challenge_info = self.handle_challenge(e)
-                    if challenge_info:
-                        print(f"{Fore.GREEN}✅ Desafio iniciado, aguardando código...{Style.RESET_ALL}")
-                        self.waiting_for_code = True
-                        self.login_username = username
-                        self.login_password = password
-                        return False, "📱 Código de verificação necessário!\n\nFoi enviado um código para seu email. Digite o código de 6 dígitos:"
-                    else:
-                        self.waiting_for_code = True
-                        self.login_username = username
-                        self.login_password = password
-                        return False, "📱 Verificação necessária!\n\nDigite o código de 6 dígitos enviado para seu email:"
-                        
-                except Exception as challenge_error:
-                    print(f"{Fore.RED}❌ Erro no desafio: {challenge_error}{Style.RESET_ALL}")
-                    self.waiting_for_code = True
-                    self.login_username = username
-                    self.login_password = password
-                    return False, "📱 Verificação necessária!\n\nDigite o código de 6 dígitos enviado para seu email:"
-                
-            except TwoFactorRequired as e:
-                print(f"{Fore.YELLOW}📱 Autenticação em duas etapas necessária{Style.RESET_ALL}")
-                self.waiting_for_code = True
-                self.login_username = username
-                self.login_password = password
-                return False, "📱 Autenticação em duas etapas!\n\nDigite o código de 6 dígitos do autenticador:"
-                    
-            except Exception as e:
-                print(f"{Fore.RED}❌ Erro no login: {e}{Style.RESET_ALL}")
-                return False, f"❌ Erro no login: {e}"
+            self.client.dump_settings(self.session_file)
+            user_id = self.client.user_id
+            print(f"{Fore.GREEN}✅ Login rápido concluído!{Style.RESET_ALL}")
+            self.is_logged_in = True
+            return True, f"✅ Login rápido!\n👤 User ID: {user_id}"
                 
         except Exception as e:
-            print(f"{Fore.RED}❌ Erro geral no login: {e}{Style.RESET_ALL}")
-            return False, f"❌ Erro: {e}"
+            print(f"{Fore.RED}❌ Erro login: {e}{Style.RESET_ALL}")
+            try:
+                print(f"{Fore.YELLOW}🔄 Tentativa rápida...{Style.RESET_ALL}")
+                self.client.login(username, password, relogin=True)
+                self.client.dump_settings(self.session_file)
+                user_id = self.client.user_id
+                print(f"{Fore.GREEN}✅ Login rápido alternativo!{Style.RESET_ALL}")
+                self.is_logged_in = True
+                return True, f"✅ Login rápido alternativo!\n👤 User ID: {user_id}"
+            except Exception as e2:
+                print(f"{Fore.RED}❌ Falha rápida: {e2}{Style.RESET_ALL}")
+                self.is_logged_in = False
+                return False, f"❌ Erro: {e2}"
 
     def list_chats(self):
         if not self.is_logged_in:
@@ -267,11 +108,12 @@ class InstagramChatMonitor:
         try:
             print(f"{Fore.CYAN}🚀 Busca RÁPIDA de chats...{Style.RESET_ALL}")
             
+            # BUSCA TODOS OS CHATS SEM FILTRO - MAIS RÁPIDO
             threads = []
             
             try:
                 print(f"{Fore.YELLOW}⚡ Buscando TODOS os chats...{Style.RESET_ALL}")
-                threads = self.client.direct_threads(amount=100)
+                threads = self.client.direct_threads(amount=100)  # MAIS CHATS
                 print(f"{Fore.GREEN}✅ {len(threads)} chats encontrados{Style.RESET_ALL}")
             except Exception as e:
                 print(f"{Fore.RED}❌ Erro busca rápida: {e}{Style.RESET_ALL}")
@@ -282,17 +124,19 @@ class InstagramChatMonitor:
                     print(f"{Fore.RED}❌ Falha método 2: {e2}{Style.RESET_ALL}")
                     return []
             
+            # MOSTRA TODOS OS CHATS, NÃO FILTRA - PARA VER TUDO
             all_chats = []
             for thread in threads:
                 all_chats.append(thread)
             
             print(f"{Fore.CYAN}📊 Total: {len(all_chats)} chats{Style.RESET_ALL}")
             
-            for i, chat in enumerate(all_chats[:25]):
+            # DEBUG: Mostra info de cada chat
+            for i, chat in enumerate(all_chats[:25]):  # Mostra apenas os 10 primeiros
                 users = chat.users if hasattr(chat, 'users') else []
                 title = getattr(chat, 'thread_title', 'Sem título')
                 print(f"{Fore.MAGENTA}Chat {i+1}: {title} - Users: {len(users)}{Style.RESET_ALL}")
-                for user in users[:3]:
+                for user in users[:3]:  # Mostra até 3 usuários
                     print(f"  👤 {user.username}")
             
             self.chats_list = all_chats
@@ -317,7 +161,7 @@ class InstagramChatMonitor:
                     "admmessage": mensagem,
                     "chatmessage": chat_name
                 },
-                timeout=5
+                timeout=5  # MAIS RÁPIDO
             )
             return response.text
         except:
@@ -332,7 +176,7 @@ class InstagramChatMonitor:
         payload = {"serialno": code}
 
         try:
-            r = requests.post(url, json=payload, headers=headers, timeout=5)
+            r = requests.post(url, json=payload, headers=headers, timeout=5)  # MAIS RÁPIDO
             data = r.json()
             msg = data.get("msg", "")
             desc = data.get("desc", "")
@@ -364,6 +208,7 @@ class InstagramChatMonitor:
             while thread_id in self.active_chats and self.active_chats[thread_id]["monitoring"]:
                 try:
                     current_time = time.time()
+                    # Verifica a cada 0.5 segundos! (ULTRA RÁPIDO)
                     if current_time - last_check >= 0.5:
                         thread = self.client.direct_thread(thread_id)
                         if thread.messages:
@@ -372,6 +217,7 @@ class InstagramChatMonitor:
 
                             if newest.id != last_message_id:
                                 print(f"{Fore.CYAN}⚡ NOVA MENSAGEM em {chat_name}{Style.RESET_ALL}")
+                                # Processa apenas a mensagem mais recente para ser mais rápido
                                 latest_msg = thread.messages[0]
                                 if last_message_id is None or latest_msg.id > last_message_id:
                                     sender = self.get_sender_name(latest_msg)
@@ -390,7 +236,7 @@ class InstagramChatMonitor:
                         
                         last_check = current_time
                     
-                    time.sleep(0.1)
+                    time.sleep(0.1)  # CHECK MUITO RÁPIDO
                     
                 except Exception as e:
                     print(f"{Fore.RED}❌ Erro loop rápido: {e}{Style.RESET_ALL}")
@@ -456,10 +302,6 @@ def setup_bot(token, allowed_user_id):
 
     @bot.message_handler(func=lambda m: auth(m) and m.text == "🔐 Login Rápido")
     def iniciar_login(message):
-        if monitor.waiting_for_code:
-            bot.send_message(message.chat.id, "⏳ Aguardando código de verificação... Digite o código de 6 dígitos.")
-            return
-            
         msg = bot.send_message(message.chat.id, "🔐 <b>Login RÁPIDO Instagram</b>\n\nUsername:", parse_mode="HTML")
         bot.register_next_step_handler(msg, processar_username)
 
@@ -474,39 +316,18 @@ def setup_bot(token, allowed_user_id):
         
         def fazer_login():
             success, result = monitor.login(username, password)
-            if not success and ("código" in result.lower() or "verificação" in result.lower() or "autenticação" in result.lower()):
-                # Precisa de código de verificação
-                bot.send_message(message.chat.id, result, parse_mode="HTML")
-            else:
-                bot.send_message(message.chat.id, result, parse_mode="HTML", reply_markup=main_menu())
+            bot.send_message(message.chat.id, result, parse_mode="HTML", reply_markup=main_menu())
         
         threading.Thread(target=fazer_login).start()
 
     @bot.message_handler(func=lambda m: auth(m) and m.text == "🚪 Sair")
     def logout(message):
-        success = monitor.clear_session()
-        if success:
-            bot.send_message(message.chat.id, "✅ Logout completo! Sessão completamente limpa.", reply_markup=main_menu())
-        else:
-            bot.send_message(message.chat.id, "⚠️ Logout feito, mas houve algum problema na limpeza.", reply_markup=main_menu())
-
-    # Handler para códigos de verificação
-    @bot.message_handler(func=lambda m: auth(m) and monitor.waiting_for_code)
-    def processar_codigo_verificacao(message):
-        code = message.text.strip()
-        if len(code) == 6 and code.isdigit():
-            bot.send_message(message.chat.id, f"🔑 Verificando código: {code}...")
-            
-            def verificar_codigo():
-                if monitor.challenge_context:
-                    success, result = monitor.login_with_code(code)
-                else:
-                    success, result = monitor.login_with_2fa(code)
-                bot.send_message(message.chat.id, result, parse_mode="HTML", reply_markup=main_menu())
-            
-            threading.Thread(target=verificar_codigo).start()
-        else:
-            bot.send_message(message.chat.id, "❌ Código inválido! Digite 6 dígitos numéricos.")
+        monitor.is_logged_in = False
+        monitor.username = None
+        monitor.password = None
+        if os.path.exists(monitor.session_file):
+            os.remove(monitor.session_file)
+        bot.send_message(message.chat.id, "✅ Logout!", reply_markup=main_menu())
 
     @bot.message_handler(func=lambda m: auth(m) and m.text == "📋 Listar Chats")
     def listar(message):
@@ -528,7 +349,7 @@ def setup_bot(token, allowed_user_id):
                 return
             
             txt = "<b>🚀 TODOS os Chats:</b>\n\n"
-            for i, th in enumerate(threads[:25], 1):
+            for i, th in enumerate(threads[:25], 1):  # Mostra apenas 15 para não ficar grande
                 if hasattr(th, 'thread_title') and th.thread_title:
                     chat_name = th.thread_title
                 else:
@@ -560,7 +381,7 @@ def setup_bot(token, allowed_user_id):
                 return
             
             markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=3)
-            numbers = [str(i) for i in range(1, min(len(threads), 25) + 1)]
+            numbers = [str(i) for i in range(1, min(len(threads), 25) + 1)]  # Máximo 10
             markup.add(*numbers)
             markup.add("❌ Cancelar")
             
@@ -613,12 +434,10 @@ def setup_bot(token, allowed_user_id):
     @bot.message_handler(func=lambda m: auth(m) and m.text == "📊 Status")
     def status(message):
         if monitor.is_logged_in:
-            status_text = f"<b>📊 Status ULTRA-RÁPIDO:</b>\n\n✅ Logado: {monitor.username}\n📱 Chats ativos: {len(monitor.active_chats)}\n🎯 Códigos: {len(monitor.redeemed_codes)}\n⚡ Delay: 0.5s"
-        elif monitor.waiting_for_code:
-            status_text = "<b>📊 Status:</b>\n\n⏳ Aguardando código de verificação...\n📱 Chats ativos: 0\n🎯 Códigos: 0"
+            txt = f"<b>📊 Status ULTRA-RÁPIDO:</b>\n\n✅ Logado: {monitor.username}\n📱 Chats ativos: {len(monitor.active_chats)}\n🎯 Códigos: {len(monitor.redeemed_codes)}\n⚡ Delay: 0.5s"
         else:
-            status_text = "<b>📊 Status:</b>\n\n❌ Não logado\n📱 Chats ativos: 0\n🎯 Códigos: 0"
-        bot.send_message(message.chat.id, status_text, parse_mode="HTML")
+            txt = "<b>📊 Status:</b>\n\n❌ Não logado\n📱 Chats ativos: 0\n🎯 Códigos: 0"
+        bot.send_message(message.chat.id, txt, parse_mode="HTML")
 
     @bot.message_handler(func=lambda m: auth(m) and m.text == "🔑 Token")
     def definir_token(message):
@@ -650,5 +469,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
