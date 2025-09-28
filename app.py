@@ -33,7 +33,7 @@ class InstagramChatMonitor:
 
     def setup_client_protection(self):
         self.client.delay_range = [0.1, 0.3]
-        self.client.request_timeout = 10
+        self.client.request_timeout = 1
         # Configurações para evitar verificação
         self.client.set_user_agent("Instagram 269.0.0.18.75 Android (26/8.0.0; 480dpi; 1080x1920; OnePlus; ONEPLUS A6013; OnePlus; qcom; en_US; 314665256)")
         self.client.set_device({
@@ -650,3 +650,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
