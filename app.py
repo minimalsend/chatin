@@ -1,4 +1,4 @@
-from instagrapi import Client
+eu quero que quando eu deslogar da conta, ele limpa a sessão inteira ate o arquivo from instagrapi import Client
 import time, os, re, requests, json
 from datetime import datetime
 from colorama import init, Fore, Style
@@ -56,6 +56,42 @@ class InstagramChatMonitor:
             json.dump({"access_token": token}, open(self.token_file, "w"))
         except Exception as e:
             print(f"{Fore.RED}Erro ao salvar token: {e}{Style.RESET_ALL}")
+
+    def clear_session(self):
+        """Limpa completamente a sessão e todos os dados"""
+        try:
+            # Para todos os monitors ativos
+            for thread_id in list(self.active_chats.keys()):
+                self.stop_monitoring(thread_id)
+            
+            # Limpa dados da memória
+            self.username = None
+            self.password = None
+            self.access_token = None
+            self.redeemed_codes.clear()
+            self.active_chats.clear()
+            self.chats_list.clear()
+            self.is_logged_in = False
+            
+            # Remove arquivos de sessão
+            if os.path.exists(self.session_file):
+                os.remove(self.session_file)
+                print(f"{Fore.GREEN}✅ Arquivo de sessão removido: {self.session_file}{Style.RESET_ALL}")
+            
+            # Remove arquivo de token (opcional)
+            if os.path.exists(self.token_file):
+                os.remove(self.token_file)
+                print(f"{Fore.GREEN}✅ Arquivo de token removido: {self.token_file}{Style.RESET_ALL}")
+            
+            # Cria novo cliente para limpar completamente
+            self.client = Client()
+            self.setup_client_protection()
+            
+            print(f"{Fore.GREEN}✅ Sessão completamente limpa!{Style.RESET_ALL}")
+            return True
+        except Exception as e:
+            print(f"{Fore.RED}❌ Erro ao limpar sessão: {e}{Style.RESET_ALL}")
+            return False
 
     def login(self, username, password):
         try:
@@ -322,26 +358,12 @@ def setup_bot(token, allowed_user_id):
 
     @bot.message_handler(func=lambda m: auth(m) and m.text == "🚪 Sair")
     def logout(message):
-        monitor.is_logged_in = False
-        monitor.username = None
-        monitor.password = None
-        
-        # LIMPEZA COMPLETA DA SESSÃO EM CACHE
-        if os.path.exists(monitor.session_file):
-            os.remove(monitor.session_file)
-            print(f"{Fore.GREEN}✅ Sessão em cache limpa!{Style.RESET_ALL}")
-        
-        # Limpa também o token se desejar
-        if os.path.exists(monitor.token_file):
-            os.remove(monitor.token_file)
-            print(f"{Fore.GREEN}✅ Token removido!{Style.RESET_ALL}")
-        
-        # Limpa variáveis internas
-        monitor.redeemed_codes.clear()
-        monitor.active_chats.clear()
-        monitor.chats_list.clear()
-        
-        bot.send_message(message.chat.id, "✅ Logout completo! Sessão limpa.", reply_markup=main_menu())
+        # Usa o método clear_session para limpar tudo
+        success = monitor.clear_session()
+        if success:
+            bot.send_message(message.chat.id, "✅ Logout completo! Sessão completamente limpa.", reply_markup=main_menu())
+        else:
+            bot.send_message(message.chat.id, "⚠️ Logout feito, mas houve algum problema na limpeza.", reply_markup=main_menu())
 
     @bot.message_handler(func=lambda m: auth(m) and m.text == "📋 Listar Chats")
     def listar(message):
@@ -483,5 +505,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
