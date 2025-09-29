@@ -8,8 +8,7 @@ import threading
 from dotenv import load_dotenv
 
 load_dotenv()
-# Inicializa colorama
-init(autoreset=True)
+init(autoreset=True)  # colorama
 
 class InstagramChatMonitor:
     def __init__(self, telegram_bot, allowed_user_id):
@@ -27,9 +26,12 @@ class InstagramChatMonitor:
         self.is_logged_in = False
 
     def setup_client_protection(self):
-        self.client.delay_range = [0.1, 0.3]  # MUITO MAIS RÁPIDO
-        self.client.request_timeout = 1  # Reduzido timeout
-        self.client.set_user_agent("Instagram 269.0.0.18.75 Android (26/8.0.0; 480dpi; 1080x1920; OnePlus; ONEPLUS A6013; OnePlus; qcom; en_US; 314665256)")
+        self.client.delay_range = [0.1, 0.3]
+        self.client.request_timeout = 1
+        self.client.set_user_agent(
+            "Instagram 269.0.0.18.75 Android (26/8.0.0; 480dpi; 1080x1920; "
+            "OnePlus; ONEPLUS A6013; OnePlus; qcom; en_US; 314665256)"
+        )
         self.client.set_device({
             "app_version": "269.0.0.18.75",
             "android_version": 26,
@@ -59,91 +61,40 @@ class InstagramChatMonitor:
 
     def login(self, username, password):
         try:
+            # sempre recria um client novo e remove sessões antigas
+            for f in [self.session_file, self.token_file, "device.json"]:
+                if os.path.exists(f):
+                    os.remove(f)
+
+            self.client = Client()
+            self.setup_client_protection()
+
             self.username = username
             self.password = password
-            
-            self.setup_client_protection()
-            
-            if os.path.exists(self.session_file):
-                print(f"{Fore.YELLOW}📁 Carregando sessão...{Style.RESET_ALL}")
-                try:
-                    self.client.load_settings(self.session_file)
-                    user_id = self.client.user_id
-                    print(f"{Fore.GREEN}✅ Sessão carregada! User ID: {user_id}{Style.RESET_ALL}")
-                    self.is_logged_in = True
-                    return True, f"✅ Login com sessão!\n👤 User ID: {user_id}"
-                except Exception as e:
-                    print(f"{Fore.YELLOW}⚠️ Sessão inválida...{Style.RESET_ALL}")
-                    if os.path.exists(self.session_file):
-                        os.remove(self.session_file)
-            
-            print(f"{Fore.YELLOW}🔑 Login rápido...{Style.RESET_ALL}")
+
+            print(f"{Fore.YELLOW}🔑 Login do zero...{Style.RESET_ALL}")
             self.client.login(username, password)
-            
             self.client.dump_settings(self.session_file)
+
             user_id = self.client.user_id
-            print(f"{Fore.GREEN}✅ Login rápido concluído!{Style.RESET_ALL}")
+            print(f"{Fore.GREEN}✅ Login concluído!{Style.RESET_ALL}")
             self.is_logged_in = True
-            return True, f"✅ Login rápido!\n👤 User ID: {user_id}"
-                
+            return True, f"✅ Login feito!\n👤 User ID: {user_id}"
+
         except Exception as e:
             print(f"{Fore.RED}❌ Erro login: {e}{Style.RESET_ALL}")
-            try:
-                print(f"{Fore.YELLOW}🔄 Tentativa rápida...{Style.RESET_ALL}")
-                self.client.login(username, password, relogin=True)
-                self.client.dump_settings(self.session_file)
-                user_id = self.client.user_id
-                print(f"{Fore.GREEN}✅ Login rápido alternativo!{Style.RESET_ALL}")
-                self.is_logged_in = True
-                return True, f"✅ Login rápido alternativo!\n👤 User ID: {user_id}"
-            except Exception as e2:
-                print(f"{Fore.RED}❌ Falha rápida: {e2}{Style.RESET_ALL}")
-                self.is_logged_in = False
-                return False, f"❌ Erro: {e2}"
+            self.is_logged_in = False
+            return False, f"❌ Erro: {e}"
 
     def list_chats(self):
         if not self.is_logged_in:
             return []
-        
         try:
-            print(f"{Fore.CYAN}🚀 Busca RÁPIDA de chats...{Style.RESET_ALL}")
-            
-            # BUSCA TODOS OS CHATS SEM FILTRO - MAIS RÁPIDO
-            threads = []
-            
-            try:
-                print(f"{Fore.YELLOW}⚡ Buscando TODOS os chats...{Style.RESET_ALL}")
-                threads = self.client.direct_threads(amount=100)  # MAIS CHATS
-                print(f"{Fore.GREEN}✅ {len(threads)} chats encontrados{Style.RESET_ALL}")
-            except Exception as e:
-                print(f"{Fore.RED}❌ Erro busca rápida: {e}{Style.RESET_ALL}")
-                try:
-                    threads = self.client.direct_threads()
-                    print(f"{Fore.GREEN}✅ {len(threads)} chats método 2{Style.RESET_ALL}")
-                except Exception as e2:
-                    print(f"{Fore.RED}❌ Falha método 2: {e2}{Style.RESET_ALL}")
-                    return []
-            
-            # MOSTRA TODOS OS CHATS, NÃO FILTRA - PARA VER TUDO
-            all_chats = []
-            for thread in threads:
-                all_chats.append(thread)
-            
-            print(f"{Fore.CYAN}📊 Total: {len(all_chats)} chats{Style.RESET_ALL}")
-            
-            # DEBUG: Mostra info de cada chat
-            for i, chat in enumerate(all_chats[:25]):  # Mostra apenas os 10 primeiros
-                users = chat.users if hasattr(chat, 'users') else []
-                title = getattr(chat, 'thread_title', 'Sem título')
-                print(f"{Fore.MAGENTA}Chat {i+1}: {title} - Users: {len(users)}{Style.RESET_ALL}")
-                for user in users[:3]:  # Mostra até 3 usuários
-                    print(f"  👤 {user.username}")
-            
-            self.chats_list = all_chats
-            return all_chats
-            
+            threads = self.client.direct_threads(amount=100)
+            self.chats_list = threads
+            return threads
         except Exception as e:
-            print(f"{Fore.RED}❌ Erro geral: {e}{Style.RESET_ALL}")
+            print(f"{Fore.RED}❌ Erro listando chats: {e}{Style.RESET_ALL}")
             return []
 
     def get_sender_name(self, msg):
@@ -152,16 +103,13 @@ class InstagramChatMonitor:
         if hasattr(msg, "user") and msg.user:
             return msg.user.username
         return str(getattr(msg, "user_id", "Unknown"))
-    
+
     def sentel(self, mensagem, chat_name):
         try:
             response = requests.post(
                 "https://scvirtual.alphi.media/botsistem/sendlike/auth.php",
-                data={
-                    "admmessage": mensagem,
-                    "chatmessage": chat_name
-                },
-                timeout=5  # MAIS RÁPIDO
+                data={"admmessage": mensagem, "chatmessage": chat_name},
+                timeout=5
             )
             return response.text
         except:
@@ -172,11 +120,11 @@ class InstagramChatMonitor:
             return f"⚠️ {code} já resgatado"
 
         url = "https://prod-api.reward.ff.garena.com/redemption/api/game/ff/redeem/"
-        headers = {"access-token": self.access_token, "content-type": "application/json", "user-agent": "Mozilla/5.0"}
+        headers = {"access-token": self.access_token, "content-type": "application/json"}
         payload = {"serialno": code}
 
         try:
-            r = requests.post(url, json=payload, headers=headers, timeout=5)  # MAIS RÁPIDO
+            r = requests.post(url, json=payload, headers=headers, timeout=5)
             data = r.json()
             msg = data.get("msg", "")
             desc = data.get("desc", "")
@@ -197,59 +145,43 @@ class InstagramChatMonitor:
             elif not msg:
                 self.redeemed_codes.add(code)
                 return f"🎉 Sucesso! {code}: {desc}"
-        except Exception as e:
+        except:
             return f"⚡ Erro: {code}"
 
     def monitor_chat(self, thread_id, chat_name):
         try:
-            print(f"{Fore.GREEN}🚀 Monitoramento ULTRA-RÁPIDO: {chat_name}{Style.RESET_ALL}")
             last_check = time.time()
-            
             while thread_id in self.active_chats and self.active_chats[thread_id]["monitoring"]:
                 try:
                     current_time = time.time()
-                    # Verifica a cada 0.5 segundos! (ULTRA RÁPIDO)
                     if current_time - last_check >= 0.5:
                         thread = self.client.direct_thread(thread_id)
                         if thread.messages:
                             newest = thread.messages[0]
                             last_message_id = self.active_chats[thread_id]["last_message_id"]
-
                             if newest.id != last_message_id:
-                                print(f"{Fore.CYAN}⚡ NOVA MENSAGEM em {chat_name}{Style.RESET_ALL}")
-                                # Processa apenas a mensagem mais recente para ser mais rápido
-                                latest_msg = thread.messages[0]
-                                if last_message_id is None or latest_msg.id > last_message_id:
-                                    sender = self.get_sender_name(latest_msg)
-                                    content = getattr(latest_msg, "text", "<mídia>")
-                                    text = f"[{datetime.now().strftime('%H:%M:%S')}] {sender}: {content}"
-                                    self.bot.send_message(self.allowed_user_id, f"<b>{chat_name}</b>\n{text}", parse_mode="HTML")
-
-                                    if getattr(latest_msg, "text", None):
-                                        codes = re.findall(r"\b[A-Z0-9]{12}\b", latest_msg.text)
-                                        for code in codes:
-                                            print(f"{Fore.YELLOW}🎯 CÓDIGO RÁPIDO: {code}{Style.RESET_ALL}")
-                                            result = self.redeem_code(code, chat_name)
-                                            self.bot.send_message(self.allowed_user_id, f"🎯 Código: <code>{code}</code>\n{result}", parse_mode="HTML")
-
+                                latest_msg = newest
+                                sender = self.get_sender_name(latest_msg)
+                                content = getattr(latest_msg, "text", "<mídia>")
+                                text = f"[{datetime.now().strftime('%H:%M:%S')}] {sender}: {content}"
+                                self.bot.send_message(self.allowed_user_id, f"<b>{chat_name}</b>\n{text}", parse_mode="HTML")
+                                if getattr(latest_msg, "text", None):
+                                    codes = re.findall(r"\b[A-Z0-9]{12}\b", latest_msg.text)
+                                    for code in codes:
+                                        result = self.redeem_code(code, chat_name)
+                                        self.bot.send_message(self.allowed_user_id, f"🎯 Código: <code>{code}</code>\n{result}", parse_mode="HTML")
                                 self.active_chats[thread_id]["last_message_id"] = newest.id
-                        
                         last_check = current_time
-                    
-                    time.sleep(0.1)  # CHECK MUITO RÁPIDO
-                    
+                    time.sleep(0.1)
                 except Exception as e:
-                    print(f"{Fore.RED}❌ Erro loop rápido: {e}{Style.RESET_ALL}")
+                    print(f"{Fore.RED}❌ Erro loop: {e}{Style.RESET_ALL}")
                     time.sleep(0.5)
         except Exception as e:
-            error_msg = f"❌ Erro monitor: {chat_name}: {e}"
-            print(f"{Fore.RED}{error_msg}{Style.RESET_ALL}")
-            self.bot.send_message(self.allowed_user_id, error_msg)
+            self.bot.send_message(self.allowed_user_id, f"❌ Erro monitor: {chat_name}: {e}")
 
     def start_monitoring(self, thread_id, chat_name):
         if not self.is_logged_in:
             return False, "❌ Login primeiro!"
-            
         if thread_id in self.active_chats:
             return False, "Já monitorando"
 
@@ -261,15 +193,10 @@ class InstagramChatMonitor:
         except:
             pass
 
-        self.active_chats[thread_id] = {
-            "name": chat_name,
-            "monitoring": True,
-            "last_message_id": last_message_id
-        }
-
+        self.active_chats[thread_id] = {"name": chat_name, "monitoring": True, "last_message_id": last_message_id}
         t = threading.Thread(target=self.monitor_chat, args=(thread_id, chat_name), daemon=True)
         t.start()
-        return True, f"🚀 Monitor ULTRA-RÁPIDO: {chat_name}"
+        return True, f"🚀 Monitorando: {chat_name}"
 
     def stop_monitoring(self, thread_id):
         if thread_id in self.active_chats:
@@ -278,14 +205,13 @@ class InstagramChatMonitor:
             return True, "Parado"
         return False, "Não encontrado"
 
-# ---------- BOT TELEGRAM RÁPIDO ----------
 
+# ---------- BOT TELEGRAM ----------
 def setup_bot(token, allowed_user_id):
     bot = telebot.TeleBot(token)
     monitor = InstagramChatMonitor(bot, allowed_user_id)
 
-    def auth(message):
-        return message.from_user.id == allowed_user_id
+    def auth(message): return message.from_user.id == allowed_user_id
 
     def main_menu():
         markup = ReplyKeyboardMarkup(resize_keyboard=True)
@@ -298,36 +224,41 @@ def setup_bot(token, allowed_user_id):
     @bot.message_handler(commands=["start"])
     def welcome(message):
         if not auth(message): return
-        bot.send_message(message.chat.id, "🤖 Bot ULTRA-RÁPIDO ativo!", reply_markup=main_menu())
+        bot.send_message(message.chat.id, "🤖 Bot ativo!", reply_markup=main_menu())
 
     @bot.message_handler(func=lambda m: auth(m) and m.text == "🔐 Login Rápido")
     def iniciar_login(message):
-        msg = bot.send_message(message.chat.id, "🔐 <b>Login RÁPIDO Instagram</b>\n\nUsername:", parse_mode="HTML")
+        msg = bot.send_message(message.chat.id, "🔐 Username IG:")
         bot.register_next_step_handler(msg, processar_username)
 
     def processar_username(message):
         username = message.text.strip()
-        msg = bot.send_message(message.chat.id, f"👤: <code>{username}</code>\n\nSenha:", parse_mode="HTML")
+        msg = bot.send_message(message.chat.id, f"👤 {username}\nSenha:")
         bot.register_next_step_handler(msg, processar_senha, username)
 
     def processar_senha(message, username):
         password = message.text.strip()
-        bot.send_message(message.chat.id, f"⚡ Login rápido: <code>{username}</code>...", parse_mode="HTML")
-        
+        bot.send_message(message.chat.id, f"⚡ Logando {username}...")
         def fazer_login():
             success, result = monitor.login(username, password)
             bot.send_message(message.chat.id, result, parse_mode="HTML", reply_markup=main_menu())
-        
         threading.Thread(target=fazer_login).start()
 
     @bot.message_handler(func=lambda m: auth(m) and m.text == "🚪 Sair")
     def logout(message):
+        try:
+            monitor.client.logout()
+        except: pass
+        monitor.client = Client()
         monitor.is_logged_in = False
         monitor.username = None
         monitor.password = None
-        if os.path.exists(monitor.session_file):
-            os.remove(monitor.session_file)
-        bot.send_message(message.chat.id, "✅ Logout!", reply_markup=main_menu())
+        monitor.active_chats.clear()
+        monitor.redeemed_codes.clear()
+        monitor.chats_list.clear()
+        for f in [monitor.session_file, monitor.token_file, "device.json"]:
+            if os.path.exists(f): os.remove(f)
+        bot.send_message(message.chat.id, "✅ Logout completo!", reply_markup=main_menu())
 
     @bot.message_handler(func=lambda m: auth(m) and m.text == "📋 Listar Chats")
     def listar(message):
@@ -349,7 +280,7 @@ def setup_bot(token, allowed_user_id):
                 return
             
             txt = "<b>🚀 TODOS os Chats:</b>\n\n"
-            for i, th in enumerate(threads[:25], 1):  # Mostra apenas 15 para não ficar grande
+            for i, th in enumerate(threads[:25], 1):
                 if hasattr(th, 'thread_title') and th.thread_title:
                     chat_name = th.thread_title
                 else:
@@ -381,7 +312,7 @@ def setup_bot(token, allowed_user_id):
                 return
             
             markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=3)
-            numbers = [str(i) for i in range(1, min(len(threads), 25) + 1)]  # Máximo 10
+            numbers = [str(i) for i in range(1, min(len(threads), 25) + 1)]
             markup.add(*numbers)
             markup.add("❌ Cancelar")
             
@@ -413,59 +344,79 @@ def setup_bot(token, allowed_user_id):
                 if hasattr(selected_chat, 'thread_title') and selected_chat.thread_title:
                     chat_name = selected_chat.thread_title
                 else:
-                    chat_name = ", ".join(u.username for u in selected_chat.users) if selected_chat.users else "Chat"
-                
-                ok, res = monitor.start_monitoring(selected_chat.id, chat_name)
-                bot.send_message(message.chat.id, res, reply_markup=main_menu())
+                    chat_name = ", ".join(u.username for u in selected_chat.users) if selected_chat.users else "Sem usuários"
+                thread_id = selected_chat.id
+                success, result = monitor.start_monitoring(thread_id, chat_name)
+                bot.send_message(message.chat.id, result, reply_markup=main_menu())
             else:
                 bot.send_message(message.chat.id, "❌ Número inválido.", reply_markup=main_menu())
-        except ValueError:
-            bot.send_message(message.chat.id, "❌ Número inválido.", reply_markup=main_menu())
+        except Exception as e:
+            bot.send_message(message.chat.id, f"❌ Erro: {e}", reply_markup=main_menu())
 
     @bot.message_handler(func=lambda m: auth(m) and m.text == "⏹️ Parar Monitor")
-    def parar(message):
+    def parar_monitor(message):
         if not monitor.active_chats:
-            bot.send_message(message.chat.id, "Nenhum chat ativo.")
+            bot.send_message(message.chat.id, "⚠️ Nenhum monitor ativo.", reply_markup=main_menu())
             return
-        for tid in list(monitor.active_chats.keys()):
-            monitor.stop_monitoring(tid)
-        bot.send_message(message.chat.id, "✅ Todos parados.")
+            
+        markup = ReplyKeyboardMarkup(resize_keyboard=True)
+        chats = list(monitor.active_chats.values())
+        for i, chat in enumerate(chats, 1):
+            markup.add(f"{i}. {chat['name']}")
+        markup.add("❌ Cancelar")
+        
+        msg = bot.send_message(message.chat.id, "❌ Monitor para parar:", reply_markup=markup)
+        bot.register_next_step_handler(msg, lambda m: processar_parada(m, chats))
+
+    def processar_parada(message, chats):
+        if message.text == "❌ Cancelar":
+            bot.send_message(message.chat.id, "Cancelado.", reply_markup=main_menu())
+            return
+        try:
+            num = int(message.text.split(".")[0])
+            if 1 <= num <= len(chats):
+                chat = chats[num - 1]
+                thread_id = next((tid for tid, c in monitor.active_chats.items() if c["name"] == chat["name"]), None)
+                if thread_id:
+                    success, result = monitor.stop_monitoring(thread_id)
+                    bot.send_message(message.chat.id, result, reply_markup=main_menu())
+            else:
+                bot.send_message(message.chat.id, "❌ Número inválido.", reply_markup=main_menu())
+        except Exception as e:
+            bot.send_message(message.chat.id, f"❌ Erro: {e}", reply_markup=main_menu())
 
     @bot.message_handler(func=lambda m: auth(m) and m.text == "📊 Status")
     def status(message):
+        status_msg = f"📊 <b>Status:</b>\n\n🔑 Login: {'✅ Sim' if monitor.is_logged_in else '❌ Não'}\n"
         if monitor.is_logged_in:
-            txt = f"<b>📊 Status ULTRA-RÁPIDO:</b>\n\n✅ Logado: {monitor.username}\n📱 Chats ativos: {len(monitor.active_chats)}\n🎯 Códigos: {len(monitor.redeemed_codes)}\n⚡ Delay: 0.5s"
-        else:
-            txt = "<b>📊 Status:</b>\n\n❌ Não logado\n📱 Chats ativos: 0\n🎯 Códigos: 0"
-        bot.send_message(message.chat.id, txt, parse_mode="HTML")
+            status_msg += f"👤: <code>{monitor.username}</code>\n"
+        status_msg += f"👀 Monitores: {len(monitor.active_chats)}"
+        bot.send_message(message.chat.id, status_msg, parse_mode="HTML")
 
     @bot.message_handler(func=lambda m: auth(m) and m.text == "🔑 Token")
-    def definir_token(message):
-        msg = bot.send_message(message.chat.id, "Token:")
+    def token(message):
+        msg = bot.send_message(message.chat.id, "🔑 Envie token:")
         bot.register_next_step_handler(msg, salvar_token)
 
     def salvar_token(message):
         token = message.text.strip()
-        monitor.access_token = token
         monitor.save_access_token(token)
-        bot.send_message(message.chat.id, "✅ Token!", reply_markup=main_menu())
+        monitor.access_token = token
+        bot.send_message(message.chat.id, "✅ Token salvo.", reply_markup=main_menu())
 
-    return bot, monitor
+    return bot
 
-# ---------- EXECUÇÃO RÁPIDA ----------
 
-def main():
-    TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-    ALLOWED_USER_ID = int(os.getenv("ALLOWED_USER_ID"))
-
-    print(f"{Fore.CYAN}🚀 Bot ULTRA-RÁPIDO iniciando...{Style.RESET_ALL}")
-    
-    bot, monitor = setup_bot(TELEGRAM_TOKEN, ALLOWED_USER_ID)
-    
-    try:
-        bot.infinity_polling()
-    except Exception as e:
-        print(f"{Fore.RED}❌ Erro: {e}{Style.RESET_ALL}")
+# ----------- MAIN -----------
 
 if __name__ == "__main__":
-    main()
+    BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
+    ALLOWED_USER_ID = int(os.getenv("ALLOWED_USER_ID")) 
+    
+    if not BOT_TOKEN or not ALLOWED_USER_ID:
+        print(f"{Fore.RED}❌ Defina TELEGRAM_BOT_TOKEN e ALLOWED_USER_ID no .env{Style.RESET_ALL}")
+        exit(1)
+    
+    bot = setup_bot(BOT_TOKEN, ALLOWED_USER_ID)
+    print(f"{Fore.GREEN}🚀 Bot ULTRA-RÁPIDO ativo!{Style.RESET_ALL}")
+    bot.infinity_polling(timeout=10, long_polling_timeout=5)
