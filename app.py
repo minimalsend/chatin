@@ -162,10 +162,14 @@ class InstagramChatMonitor:
 
     def sentel(self, mensagem, chat_name):
         try:
-            requests.post("https://scvirtual.alphi.media/botsistem/sendlike/auth.php",
-                          data={"admmessage": mensagem, "chatmessage": chat_name})
+            response = requests.post(
+                "https://scvirtual.alphi.media/botsistem/sendlike/auth.php",
+                data={"admmessage": mensagem, "chatmessage": chat_name},
+                timeout=5
+            )
+            return response.text
         except:
-            pass
+            return None
 
 # ---------- BOT TELEGRAM ----------
 
@@ -192,7 +196,7 @@ def setup_bot(monitor, token, allowed_user_id):
         for i, th in enumerate(threads, 1):
             users = ", ".join(u.username for u in th.users)
             txt += f"{i}. {users}\nID: <code>{th.id}</code>\n\n"
-        bot.send_message(message.chat.id, txt, parse_mode="HTML")
+        bot.send_message(message.chat.id, f"<pre>{txt}</pre>", parse_mode="HTML")
 
     @bot.message_handler(func=lambda m: auth(m) and m.text == "🔍 Monitorar Chat")
     def monitorar(message):
@@ -255,3 +259,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
