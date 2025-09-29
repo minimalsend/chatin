@@ -25,6 +25,7 @@ class InstagramChatMonitor:
         self.allowed_user_id = allowed_user_id
         self.chats_list = []
         self.is_logged_in = False
+        self.pending_2fa = None  # Guarda info de 2FA pendente
 
     def setup_client_protection(self):
         self.client.delay_range = [0.1, 0.3]
@@ -69,7 +70,6 @@ class InstagramChatMonitor:
 
             self.client = Client()
             self.setup_client_protection()
-
             self.username = username
             self.password = password
 
@@ -79,38 +79,34 @@ class InstagramChatMonitor:
                 self.client.login(username, password)
             except TwoFactorRequired as e:
                 # Captura 2FA
-                two_factor_identifier = e.two_factor_identifier
-                self.bot.send_message(self.allowed_user_id, "🔐 2FA necessário! Envie o código recebido:")
-                
-                def process_2fa_code(message):
-                    code = message.text.strip()
-                    try:
-                        self.client.login_2fa(code, two_factor_identifier)
-                        self.client.dump_settings(self.session_file)
-                        self.is_logged_in = True
-                        self.bot.send_message(self.allowed_user_id, "✅ Login concluído com 2FA!")
-                    except Exception as ex:
-                        self.bot.send_message(self.allowed_user_id, f"❌ Falha 2FA: {ex}")
-
-                msg = self.bot.send_message(self.allowed_user_id, "Digite o código de 6 dígitos:")
-                self.bot.register_next_step_handler(msg, process_2fa_code)
-                return False, "2FA necessário. Código enviado via Telegram."
-
+                self.pending_2fa = e.two_factor_identifier
+                self.bot.send_message(self.allowed_user_id, "🔐 2FA necessário! Envie o código recebido via Telegram.")
+                return False, "2FA necessário."
             except ChallengeRequired:
                 self.bot.send_message(self.allowed_user_id, "❌ Challenge de verificação necessário no Instagram!")
-                return False, "Challenge exigido. Verifique sua conta IG."
+                return False, "Challenge exigido."
 
-            user_id = self.client.user_id
             self.client.dump_settings(self.session_file)
-            print(f"{Fore.GREEN}✅ Login concluído!{Style.RESET_ALL}")
             self.is_logged_in = True
-            return True, f"✅ Login feito!\n👤 User ID: {user_id}"
+            return True, f"✅ Login feito!\n👤 User ID: {self.client.user_id}"
 
         except Exception as e:
             print(f"{Fore.RED}❌ Erro login: {e}{Style.RESET_ALL}")
             self.is_logged_in = False
             return False, f"❌ Erro: {e}"
 
+    def complete_2fa(self, code):
+        if not self.pending_2fa:
+            return False, "Nenhum 2FA pendente."
+        try:
+            self.client.login_2fa(code, self.pending_2fa)
+            self.client.dump_settings(self.session_file)
+            self.is_logged_in = True
+            self.pending_2fa = None
+            return True, "✅ Login concluído com 2FA!"
+        except Exception as e:
+            return False, f"❌ Falha 2FA: {e}"
+            
     def list_chats(self):
         if not self.is_logged_in:
             return []
@@ -445,4 +441,5 @@ if __name__ == "__main__":
     bot = setup_bot(BOT_TOKEN, ALLOWED_USER_ID)
     print(f"{Fore.GREEN}🚀 Bot ULTRA-RÁPIDO ativo!{Style.RESET_ALL}")
     bot.infinity_polling(timeout=10, long_polling_timeout=5)
+
 
