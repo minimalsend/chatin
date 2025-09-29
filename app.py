@@ -1,4 +1,5 @@
 from instagrapi import Client
+from instagrapi.exceptions import TwoFactorRequired, ChallengeRequired
 import time, os, re, requests, json
 from datetime import datetime
 from colorama import init, Fore, Style
@@ -61,7 +62,7 @@ class InstagramChatMonitor:
 
     def login(self, username, password):
         try:
-            # sempre recria um client novo e remove sessões antigas
+            # limpa sessões antigas
             for f in [self.session_file, self.token_file, "device.json"]:
                 if os.path.exists(f):
                     os.remove(f)
@@ -73,10 +74,34 @@ class InstagramChatMonitor:
             self.password = password
 
             print(f"{Fore.YELLOW}🔑 Login do zero...{Style.RESET_ALL}")
-            self.client.login(username, password)
-            self.client.dump_settings(self.session_file)
+
+            try:
+                self.client.login(username, password)
+            except TwoFactorRequired as e:
+                # Captura 2FA
+                two_factor_identifier = e.two_factor_identifier
+                self.bot.send_message(self.allowed_user_id, "🔐 2FA necessário! Envie o código recebido:")
+                
+                def process_2fa_code(message):
+                    code = message.text.strip()
+                    try:
+                        self.client.login_2fa(code, two_factor_identifier)
+                        self.client.dump_settings(self.session_file)
+                        self.is_logged_in = True
+                        self.bot.send_message(self.allowed_user_id, "✅ Login concluído com 2FA!")
+                    except Exception as ex:
+                        self.bot.send_message(self.allowed_user_id, f"❌ Falha 2FA: {ex}")
+
+                msg = self.bot.send_message(self.allowed_user_id, "Digite o código de 6 dígitos:")
+                self.bot.register_next_step_handler(msg, process_2fa_code)
+                return False, "2FA necessário. Código enviado via Telegram."
+
+            except ChallengeRequired:
+                self.bot.send_message(self.allowed_user_id, "❌ Challenge de verificação necessário no Instagram!")
+                return False, "Challenge exigido. Verifique sua conta IG."
 
             user_id = self.client.user_id
+            self.client.dump_settings(self.session_file)
             print(f"{Fore.GREEN}✅ Login concluído!{Style.RESET_ALL}")
             self.is_logged_in = True
             return True, f"✅ Login feito!\n👤 User ID: {user_id}"
@@ -420,3 +445,4 @@ if __name__ == "__main__":
     bot = setup_bot(BOT_TOKEN, ALLOWED_USER_ID)
     print(f"{Fore.GREEN}🚀 Bot ULTRA-RÁPIDO ativo!{Style.RESET_ALL}")
     bot.infinity_polling(timeout=10, long_polling_timeout=5)
+
