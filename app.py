@@ -3,7 +3,7 @@ import time, os, re, requests, json
 from datetime import datetime
 from colorama import init, Fore, Style
 import telebot
-from telebot.types import ReplyKeyboardMarkup
+from telebot.types import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
 import threading
 from dotenv import load_dotenv
 
@@ -184,9 +184,18 @@ class InstagramChatMonitor:
     def stop_monitoring(self, thread_id):
         if thread_id in self.active_chats:
             self.active_chats[thread_id]["monitoring"] = False
+            chat_name = self.active_chats[thread_id]["name"]
             del self.active_chats[thread_id]
-            return True, "Monitoramento parado"
+            return True, f"Monitoramento parado para {chat_name}"
         return False, "Chat não encontrado"
+
+    def stop_all_monitoring(self):
+        stopped_count = 0
+        for thread_id in list(self.active_chats.keys()):
+            self.active_chats[thread_id]["monitoring"] = False
+            del self.active_chats[thread_id]
+            stopped_count += 1
+        return stopped_count
 
 # ---------- BOT TELEGRAM ----------
 
@@ -196,12 +205,46 @@ def setup_bot(monitor, token, allowed_user_id):
     def auth(message):
         return message.from_user.id == allowed_user_id
 
+    def main_menu():
+        markup = ReplyKeyboardMarkup(resize_keyboard=True)
+        markup.add("📋 Listar Chats", "🔍 Monitorar Chats", "⏹️ Parar Monitoramento", "📊 Status", "🔑 Definir Token")
+        return markup
+
+    def create_chat_selection_keyboard(threads, action="monitor"):
+        markup = InlineKeyboardMarkup(row_width=2)
+        
+        # Botões de ação rápida
+        if action == "monitor":
+            markup.add(
+                InlineKeyboardButton("✅ Todos", callback_data=f"monitor_all"),
+                InlineKeyboardButton("❌ Nenhum", callback_data=f"monitor_none")
+            )
+        elif action == "stop":
+            markup.add(
+                InlineKeyboardButton("🛑 Parar Todos", callback_data=f"stop_all")
+            )
+        
+        # Botões individuais para cada chat
+        for i, th in enumerate(threads, 1):
+            users = ", ".join(u.username for u in th.users)
+            # Encurta o nome se for muito longo
+            if len(users) > 20:
+                display_name = users[:20] + "..."
+            else:
+                display_name = users
+                
+            if action == "monitor":
+                markup.add(InlineKeyboardButton(f"{i}. {display_name}", callback_data=f"monitor_{th.id}"))
+            elif action == "stop":
+                if th.id in monitor.active_chats:
+                    markup.add(InlineKeyboardButton(f"⏹️ {i}. {display_name}", callback_data=f"stop_{th.id}"))
+        
+        return markup
+
     @bot.message_handler(commands=["start"])
     def welcome(message):
         if not auth(message): return
-        markup = ReplyKeyboardMarkup(resize_keyboard=True)
-        markup.add("📋 Listar Chats", "🔍 Monitorar Chat", "⏹️ Parar Monitoramento", "📊 Status", "🔑 Definir Token")
-        bot.send_message(message.chat.id, "🤖 Bot ativo!", reply_markup=markup)
+        bot.send_message(message.chat.id, "🤖 Bot ativo!", reply_markup=main_menu())
 
     @bot.message_handler(func=lambda m: auth(m) and m.text == "📋 Listar Chats")
     def listar(message):
@@ -213,66 +256,116 @@ def setup_bot(monitor, token, allowed_user_id):
         txt = "<b>📨 Chats disponíveis:</b>\n\n"
         for i, th in enumerate(threads, 1):
             users = ", ".join(u.username for u in th.users)
-            txt += f"{i}. {users}\n\n"
+            status = "🟢 ATIVO" if th.id in monitor.active_chats else "⚪ INATIVO"
+            txt += f"{i}. {users} - {status}\n\n"
         
         bot.send_message(message.chat.id, f"<pre>{txt}</pre>", parse_mode="HTML")
 
-    @bot.message_handler(func=lambda m: auth(m) and m.text == "🔍 Monitorar Chat")
+    @bot.message_handler(func=lambda m: auth(m) and m.text == "🔍 Monitorar Chats")
     def monitorar(message):
         threads = monitor.list_chats()
         if not threads:
             bot.send_message(message.chat.id, "📭 Nenhum chat encontrado.")
             return
         
-        # Cria teclado com números dos chats
-        markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=3)
-        numbers = [str(i) for i in range(1, len(threads) + 1)]
-        markup.add(*numbers)
-        markup.add("❌ Cancelar")
-        
-        txt = "<b>🔍 Selecione o número do chat para monitorar:</b>\n\n"
+        txt = "<b>🔍 Selecione os chats para monitorar:</b>\n\n"
         for i, th in enumerate(threads, 1):
             users = ", ".join(u.username for u in th.users)
-            txt += f"{i}. {users}\n"
+            status = "🟢 JÁ MONITORANDO" if th.id in monitor.active_chats else "⚪"
+            txt += f"{i}. {users} - {status}\n"
         
-        msg = bot.send_message(message.chat.id, f"<pre>{txt}</pre>", parse_mode="HTML", reply_markup=markup)
-        bot.register_next_step_handler(msg, lambda m: processar_selecao_chat(m, threads))
-
-    def processar_selecao_chat(message, threads):
-        if message.text == "❌ Cancelar":
-            bot.send_message(message.chat.id, "Operação cancelada.", reply_markup=main_menu())
-            return
-            
-        try:
-            selected_num = int(message.text)
-            if 1 <= selected_num <= len(threads):
-                selected_chat = threads[selected_num - 1]
-                chat_name = ", ".join(u.username for u in selected_chat.users)
-                
-                ok, res = monitor.start_monitoring(selected_chat.id, chat_name)
-                bot.send_message(message.chat.id, res, reply_markup=main_menu())
-            else:
-                bot.send_message(message.chat.id, "❌ Número inválido. Use /start para recomeçar.", reply_markup=main_menu())
-        except ValueError:
-            bot.send_message(message.chat.id, "❌ Por favor, digite um número válido. Use /start para recomeçar.", reply_markup=main_menu())
-
-    def main_menu():
-        markup = ReplyKeyboardMarkup(resize_keyboard=True)
-        markup.add("📋 Listar Chats", "🔍 Monitorar Chat", "⏹️ Parar Monitoramento", "📊 Status", "🔑 Definir Token")
-        return markup
+        markup = create_chat_selection_keyboard(threads, "monitor")
+        bot.send_message(message.chat.id, f"<pre>{txt}</pre>", parse_mode="HTML", reply_markup=markup)
 
     @bot.message_handler(func=lambda m: auth(m) and m.text == "⏹️ Parar Monitoramento")
     def parar(message):
         if not monitor.active_chats:
-            bot.send_message(message.chat.id, "Nenhum chat ativo.")
+            bot.send_message(message.chat.id, "Nenhum chat ativo para parar.")
             return
-        for tid in list(monitor.active_chats.keys()):
-            monitor.stop_monitoring(tid)
-        bot.send_message(message.chat.id, "✅ Todos os monitoramentos parados.")
+        
+        threads = monitor.list_chats()
+        active_threads = [th for th in threads if th.id in monitor.active_chats]
+        
+        if not active_threads:
+            bot.send_message(message.chat.id, "Nenhum chat ativo encontrado na lista.")
+            return
+        
+        txt = "<b>⏹️ Selecione os chats para parar:</b>\n\n"
+        for i, th in enumerate(active_threads, 1):
+            users = ", ".join(u.username for u in th.users)
+            txt += f"{i}. {users}\n"
+        
+        markup = create_chat_selection_keyboard(active_threads, "stop")
+        bot.send_message(message.chat.id, f"<pre>{txt}</pre>", parse_mode="HTML", reply_markup=markup)
+
+    @bot.callback_query_handler(func=lambda call: True)
+    def handle_callback(call):
+        if call.data.startswith("monitor_"):
+            action = call.data[8:]  # Remove "monitor_"
+            threads = monitor.chats_list
+            
+            if action == "all":
+                # Monitorar todos os chats
+                started_count = 0
+                for th in threads:
+                    if th.id not in monitor.active_chats:
+                        chat_name = ", ".join(u.username for u in th.users)
+                        ok, res = monitor.start_monitoring(th.id, chat_name)
+                        if ok:
+                            started_count += 1
+                bot.answer_callback_query(call.id, f"✅ {started_count} chats iniciados!")
+                bot.edit_message_text(f"🎯 Monitorando {started_count} chats!", call.message.chat.id, call.message.message_id)
+                
+            elif action == "none":
+                # Não monitorar nenhum
+                bot.answer_callback_query(call.id, "Nenhum chat selecionado")
+                bot.edit_message_text("❌ Nenhum chat selecionado para monitorar", call.message.chat.id, call.message.message_id)
+                
+            else:
+                # Monitorar chat específico
+                thread_id = action
+                chat_obj = next((th for th in threads if str(th.id) == thread_id), None)
+                if chat_obj:
+                    chat_name = ", ".join(u.username for u in chat_obj.users)
+                    ok, res = monitor.start_monitoring(thread_id, chat_name)
+                    bot.answer_callback_query(call.id, res)
+                    if ok:
+                        bot.edit_message_text(f"✅ {res}", call.message.chat.id, call.message.message_id)
+                    else:
+                        bot.edit_message_text(f"❌ {res}", call.message.chat.id, call.message.message_id)
+                else:
+                    bot.answer_callback_query(call.id, "Chat não encontrado")
+        
+        elif call.data.startswith("stop_"):
+            action = call.data[5:]  # Remove "stop_"
+            
+            if action == "all":
+                # Parar todos os chats
+                stopped_count = monitor.stop_all_monitoring()
+                bot.answer_callback_query(call.id, f"✅ {stopped_count} chats parados!")
+                bot.edit_message_text(f"🛑 Todos os {stopped_count} chats parados!", call.message.chat.id, call.message.message_id)
+                
+            else:
+                # Parar chat específico
+                thread_id = action
+                ok, res = monitor.stop_monitoring(thread_id)
+                bot.answer_callback_query(call.id, res)
+                if ok:
+                    bot.edit_message_text(f"✅ {res}", call.message.chat.id, call.message.message_id)
+                else:
+                    bot.edit_message_text(f"❌ {res}", call.message.chat.id, call.message.message_id)
 
     @bot.message_handler(func=lambda m: auth(m) and m.text == "📊 Status")
     def status(message):
-        txt = f"<b>📊 Status:</b>\n\nLogado como: {monitor.username}\nChats ativos: {len(monitor.active_chats)}\nCódigos resgatados: {len(monitor.redeemed_codes)}"
+        active_chats_list = "\n".join([f"• {info['name']}" for info in monitor.active_chats.values()])
+        txt = f"""<b>📊 Status:</b>
+
+Logado como: {monitor.username}
+Chats ativos: {len(monitor.active_chats)}
+Códigos resgatados: {len(monitor.redeemed_codes)}
+
+<b>Chats monitorados:</b>
+{active_chats_list if active_chats_list else 'Nenhum'}"""
         bot.send_message(message.chat.id, f"<pre>{txt}</pre>", parse_mode="HTML")
 
     @bot.message_handler(func=lambda m: auth(m) and m.text == "🔑 Definir Token")
@@ -284,7 +377,7 @@ def setup_bot(monitor, token, allowed_user_id):
         token = message.text.strip()
         monitor.access_token = token
         monitor.save_access_token(token)
-        bot.send_message(message.chat.id, "✅ Token salvo!")
+        bot.send_message(message.chat.id, "✅ Token salvo!", reply_markup=main_menu())
 
     return bot
 
@@ -308,5 +401,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
