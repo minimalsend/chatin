@@ -1,22 +1,22 @@
 {
     "uuids": {
-        "phone_id": "ecfe2e53-ea64-457d-ae59-ef4350702af5",
-        "uuid": "9475eaba-e5d1-48b8-9405-aae9c71a9b41",
-        "client_session_id": "0fe20f38-4127-44eb-a363-b1f9026bd459",
-        "advertising_id": "fc40b767-53ca-462b-9a4d-7a71d2de0e79",
-        "android_device_id": "android-466e339f2aa3d2dd",
-        "request_id": "b3e9d638-ba0c-41cc-a819-df637be091bf",
-        "tray_session_id": "f51b44b2-5248-4d82-bdc4-0227723332c9"
+        "phone_id": "0cfa7aed-51ec-41e2-b234-cd8b2673a847",
+        "uuid": "783acb64-3db5-408c-b176-002c518c7b3e",
+        "client_session_id": "a22b7df7-d391-4e55-9e23-94843a830af1",
+        "advertising_id": "0882ba88-98d4-40d6-86d7-616d862fbfb7",
+        "android_device_id": "android-27a5c5ca0ca8c54e",
+        "request_id": "2adb6f26-47fd-44bb-b61e-461081a9fb03",
+        "tray_session_id": "5637ebe9-fca0-400a-9131-e98a2703d4cb"
     },
-    "mid": "aH-BHAABAAEC-XDqnB-dAZZen5ZR",
+    "mid": "aOEt9AABAAH0GTBSNymoRoUU2gLf",
     "ig_u_rur": null,
     "ig_www_claim": null,
     "authorization_data": {
         "ds_user_id": "47219317719",
-        "sessionid": "47219317719%3AhbhsHOBml7noaX%3A19%3AAYfXF7jKbbAI6S-7Qm3le_h6JQRWC70NGdczz78f9Q"
+        "sessionid": "47219317719%3A0qVsE4aBQyXQen%3A2%3AAYgARBjWlLr7jYGTXYfktgAy2amMruBLilvpGRghmQ"
     },
     "cookies": {},
-    "last_login": 1753186768.0602684,
+    "last_login": 1759587845.2368188,
     "device_settings": {
         "app_version": "269.0.0.18.75",
         "android_version": 26,
@@ -24,12 +24,12 @@
         "dpi": "480dpi",
         "resolution": "1080x1920",
         "manufacturer": "OnePlus",
-        "device": "devitron",
-        "model": "6T Dev",
+        "device": "ONEPLUS A6013",
+        "model": "OnePlus6T",
         "cpu": "qcom",
         "version_code": "314665256"
     },
-    "user_agent": "Instagram 269.0.0.18.75 Android (26/8.0.0; 480dpi; 1080x1920; OnePlus; 6T Dev; devitron; qcom; en_US; 314665256)",
+    "user_agent": "Instagram 269.0.0.18.75 Android (26/8.0.0; 480dpi; 1080x1920; OnePlus; ONEPLUS A6013; OnePlus; qcom; en_US; 314665256)",
     "country": "US",
     "country_code": 1,
     "locale": "en_US",
