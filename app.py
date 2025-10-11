@@ -26,8 +26,8 @@ class InstagramChatMonitor:
         self.chats_list = []  # Lista para armazenar chats temporariamente
 
     def setup_client_protection(self):
-        self.client.delay_range = [0.1, 0.2]
-        self.client.request_timeout = 3
+        self.client.delay_range = [0.1, 0.1]
+        self.client.request_timeout = 1
         self.client.set_user_agent("Instagram 219.0.0.12.117 Android")
         self.client.set_device({
             "manufacturer": "samsung",
@@ -401,3 +401,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
