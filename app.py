@@ -228,8 +228,8 @@ def setup_bot(monitor, token, allowed_user_id):
         for i, th in enumerate(threads, 1):
             users = ", ".join(u.username for u in th.users)
             # Encurta o nome se for muito longo
-            if len(users) > 20:
-                display_name = users[:20] + "..."
+            if len(users) > 30:
+                display_name = users[:30] + "..."
             else:
                 display_name = users
                 
@@ -401,4 +401,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
